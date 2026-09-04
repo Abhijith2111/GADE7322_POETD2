@@ -40,7 +40,7 @@ void ATDGameMode::NotifyWaveCompleted()
 
 	if (WavesCompleted >= WaveCountToWin)
 	{
-		SetGamePhase(EGamePhase::GameOverVictory);
+		SetGamePhase(EGamePhase::Victory);
 		OnVictory.Broadcast();
 		UE_LOG(LogTemp, Log, TEXT("TDGameMode: ===== VICTORY - All waves survived! ====="));
 	}
@@ -89,7 +89,7 @@ void ATDGameMode::HandleCentralTowerDestroyed()
 {
 	if (CurrentPhase == EGamePhase::InProgress)
 	{
-		SetGamePhase(EGamePhase::GameOverLoss);
+		SetGamePhase(EGamePhase::Defeat);
 		OnLoss.Broadcast();
 		UE_LOG(LogTemp, Warning, TEXT("TDGameMode: ===== GAME OVER - Central tower destroyed! ====="));
 	}

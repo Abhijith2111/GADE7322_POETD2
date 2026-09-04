@@ -10,8 +10,8 @@ enum class EGamePhase : uint8
 {
 	WaitingToStart,
 	InProgress,
-	GameOverVictory,cla
-	GameOverLoss
+	Victory,
+	Defeat
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnGamePhaseChanged, EGamePhase, NewPhase);

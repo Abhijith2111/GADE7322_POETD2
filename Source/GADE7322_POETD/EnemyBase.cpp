@@ -67,35 +67,34 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
-	AActor* Target = FindNearestAttackTarget();
+	ADefenderBase* NearestDefender = FindNearestDefenderInRange();
+	const bool bDefenderInRange = NearestDefender != nullptr;
 
-	if (Target)
+	ACentralTowerBase* Tower = FindCentralTower();
+	const bool bAtFinalWaypoint = CurrentWaypointIndex >= Waypoints.Num();
+	const bool bTowerInRange = Tower && bAtFinalWaypoint &&
+		FVector::Dist(GetActorLocation(), Tower->GetActorLocation()) <= AttackRange;
+
+	const bool bShouldAttack = bDefenderInRange || bTowerInRange;
+
+	if (bShouldAttack)
 	{
-		const float DistToTarget = FVector::Dist(GetActorLocation(), Target->GetActorLocation());
-		if (DistToTarget <= AttackRange)
+		if (!bIsAttacking)
 		{
-			if (!bIsAttacking)
-			{
-				bIsAttacking = true;
-				GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
-			}
-			return;
+			bIsAttacking = true;
+			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
 		}
-
-		const FVector Direction = (Target->GetActorLocation() - GetActorLocation()).GetSafeNormal();
-		AddMovementInput(Direction);
-
-		DrawDebugLine(GetWorld(), GetActorLocation(), Target->GetActorLocation(), FColor::Orange, false, 0.05f, 0, 2.f);
-		return;
 	}
-
-	if (bIsAttacking)
+	else
 	{
-		bIsAttacking = false;
-		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+		if (bIsAttacking)
+		{
+			bIsAttacking = false;
+			GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+		}
 	}
 
-	if (CurrentWaypointIndex >= Waypoints.Num())
+	if (bAtFinalWaypoint)
 	{
 		return;
 	}
@@ -121,13 +120,14 @@ void AEnemyBase::Tick(float DeltaTime)
 	DrawDebugSphere(GetWorld(), TargetWaypoint, 20.f, 6, FColor::Yellow, false, 0.05f);
 }
 
-AActor* AEnemyBase::FindNearestAttackTarget() const
+ADefenderBase* AEnemyBase::FindNearestDefenderInRange() const
 {
-	AActor* BestTarget = nullptr;
-	float BestDistSq = FMath::Square(AttackRange * 3.f);
-
 	TArray<AActor*> Defenders;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderBase::StaticClass(), Defenders);
+
+	ADefenderBase* Nearest = nullptr;
+	float NearestDistSq = FMath::Square(AttackRange);
+
 	for (AActor* Actor : Defenders)
 	{
 		ADefenderBase* Defender = Cast<ADefenderBase>(Actor);
@@ -137,37 +137,31 @@ AActor* AEnemyBase::FindNearestAttackTarget() const
 		}
 
 		const float DistSq = FVector::DistSquared(GetActorLocation(), Defender->GetActorLocation());
-		if (DistSq < BestDistSq)
+		if (DistSq <= NearestDistSq)
 		{
-			BestDistSq = DistSq;
-			BestTarget = Defender;
+			NearestDistSq = DistSq;
+			Nearest = Defender;
 		}
 	}
 
-	if (BestTarget)
-	{
-		return BestTarget;
-	}
+	return Nearest;
+}
 
+ACentralTowerBase* AEnemyBase::FindCentralTower() const
+{
 	TArray<AActor*> Towers;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACentralTowerBase::StaticClass(), Towers);
+
 	for (AActor* Actor : Towers)
 	{
 		ACentralTowerBase* Tower = Cast<ACentralTowerBase>(Actor);
-		if (!Tower || Tower->IsDestroyed())
+		if (Tower && !Tower->IsDestroyed())
 		{
-			continue;
-		}
-
-		const float DistSq = FVector::DistSquared(GetActorLocation(), Tower->GetActorLocation());
-		if (DistSq < BestDistSq)
-		{
-			BestDistSq = DistSq;
-			BestTarget = Tower;
+			return Tower;
 		}
 	}
 
-	return BestTarget;
+	return nullptr;
 }
 
 void AEnemyBase::ExecuteAttack()
@@ -177,36 +171,30 @@ void AEnemyBase::ExecuteAttack()
 		return;
 	}
 
-	AActor* Target = FindNearestAttackTarget();
-	if (!Target)
+	ADefenderBase* NearestDefender = FindNearestDefenderInRange();
+	if (NearestDefender)
 	{
-		bIsAttacking = false;
-		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+		NearestDefender->ApplyDamage(AttackDamage);
+		UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked Defender %s for %.1f damage"),
+			*GetName(), *NearestDefender->GetName(), AttackDamage);
 		return;
 	}
 
-	const float DistToTarget = FVector::Dist(GetActorLocation(), Target->GetActorLocation());
-	if (DistToTarget > AttackRange)
+	ACentralTowerBase* Tower = FindCentralTower();
+	if (Tower && CurrentWaypointIndex >= Waypoints.Num())
 	{
-		bIsAttacking = false;
-		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-		return;
+		const float DistToTower = FVector::Dist(GetActorLocation(), Tower->GetActorLocation());
+		if (DistToTower <= AttackRange)
+		{
+			Tower->ApplyDamage(AttackDamage);
+			UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked CentralTower for %.1f damage"),
+				*GetName(), AttackDamage);
+			return;
+		}
 	}
 
-	ADefenderBase* Defender = Cast<ADefenderBase>(Target);
-	if (Defender)
-	{
-		Defender->ApplyDamage(AttackDamage);
-		UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked Defender %s for %.1f damage"), *GetName(), *Defender->GetName(), AttackDamage);
-		return;
-	}
-
-	ACentralTowerBase* Tower = Cast<ACentralTowerBase>(Target);
-	if (Tower)
-	{
-		Tower->ApplyDamage(AttackDamage);
-		UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked CentralTower %s for %.1f damage"), *GetName(), *Tower->GetName(), AttackDamage);
-	}
+	bIsAttacking = false;
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 }
 
 void AEnemyBase::TakeDamageFromDefender(float DamageAmount)

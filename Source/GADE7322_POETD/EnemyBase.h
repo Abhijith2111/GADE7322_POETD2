@@ -4,6 +4,9 @@
 #include "GameFramework/Character.h"
 #include "EnemyBase.generated.h"
 
+class ADefenderBase;
+class ACentralTowerBase;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyDestroyed, int32, RewardAmount);
 
@@ -70,7 +73,8 @@ private:
 
 	FTimerHandle AttackTimerHandle;
 
-	AActor* FindNearestAttackTarget() const;
+	ADefenderBase* FindNearestDefenderInRange() const;
+	ACentralTowerBase* FindCentralTower() const;
 	void ExecuteAttack();
 	void HandleDeath();
 };
