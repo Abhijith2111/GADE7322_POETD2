@@ -19,7 +19,6 @@ void UTDHUDWidget::NativeConstruct()
 	}
 	else
 	{
-		// Safe fallback so the HUD isn't blank while GameState is still spinning up.
 		RefreshGold(0);
 	}
 
@@ -61,7 +60,7 @@ void UTDHUDWidget::TryBindTowerHealth()
 	ACentralTowerBase* Tower = CachedGameState->GetCentralTower();
 	if (!IsValid(Tower))
 	{
-		return; // Tower hasn't self-registered yet — retried each Tick until it does.
+		return; 
 	}
 
 	Tower->OnHealthChanged.AddDynamic(this, &UTDHUDWidget::HandleTowerHealthChanged);

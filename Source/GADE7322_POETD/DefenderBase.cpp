@@ -25,7 +25,6 @@ ADefenderBase::ADefenderBase()
 	DefenderMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	DefenderMesh->SetCollisionProfileName(TEXT("BlockAll"));
 
-	// --- Phase 5: overhead health bar ---
 	HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidgetComponent"));
 	HealthBarWidgetComponent->SetupAttachment(RootComponent);
 	HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
@@ -33,9 +32,6 @@ ADefenderBase::ADefenderBase()
 	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
 	HealthBarWidgetComponent->SetTickWhenOffscreen(false);
 
-	// Optional: auto-assign the widget class if the WBP exists at this path.
-	// If it fails (asset not created yet), just assign WidgetClass manually
-	// on a Blueprint child's Details panel instead — see setup notes below.
 	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarWidgetAsset(TEXT("/Game/UI/WBP_HealthBar"));
 	if (HealthBarWidgetAsset.Succeeded())
 	{

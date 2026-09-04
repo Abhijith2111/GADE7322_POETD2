@@ -44,7 +44,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Economy")
 	int32 GetCurrentMoney() const;
 
-	// --- Phase 5: UI ---
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void RegisterCentralTower(ACentralTowerBase* InTower);
 

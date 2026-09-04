@@ -14,10 +14,12 @@ void ATDPlayerController::BeginPlay()
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
-	// --- Phase 5: HUD ---
+	
 	if (HUDWidgetClass)
 	{
 		HUDWidgetInstance = CreateWidget<UTDHUDWidget>(this, HUDWidgetClass);
+		
+
 		if (HUDWidgetInstance)
 		{
 			HUDWidgetInstance->AddToViewport(0);
@@ -249,7 +251,6 @@ void ATDPlayerController::TryUpgradeDefender()
 	OnDefenderUpgraded.Broadcast(ClickedDefender, NewLevel);
 }
 
-// --- Phase 5: UI ---
 void ATDPlayerController::TogglePauseMenu()
 {
 	bIsPaused = !bIsPaused;
@@ -263,7 +264,7 @@ void ATDPlayerController::TogglePauseMenu()
 
 		if (IsValid(PauseMenuInstance) && !PauseMenuInstance->IsInViewport())
 		{
-			PauseMenuInstance->AddToViewport(10); // above the HUD
+			PauseMenuInstance->AddToViewport(10); 
 		}
 
 		UGameplayStatics::SetGamePaused(GetWorld(), true);
@@ -289,8 +290,6 @@ void ATDPlayerController::TogglePauseMenu()
 		SetInputMode(InputMode);
 	}
 
-	// bShowMouseCursor stays true throughout — this game needs the cursor for
-	// defender placement/upgrading even during normal (unpaused) play.
 }
 
 void ATDPlayerController::SetPendingDefender(TSubclassOf<ADefenderBase> InClass, int32 InCost)

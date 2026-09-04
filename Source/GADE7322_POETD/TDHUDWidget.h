@@ -19,7 +19,6 @@ public:
 	UPROPERTY(meta = (BindWidget))
 	class UTextBlock* TowerHealthText;
 
-	// Any Panel widget (Horizontal Box / Wrap Box / Uniform Grid) holding WBP_DefenderButton instances.
 	UPROPERTY(meta = (BindWidgetOptional))
 	class UPanelWidget* DefenderButtonContainer;
 

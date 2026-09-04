@@ -30,9 +30,8 @@ AEnemyBase::AEnemyBase()
 	bUseControllerRotationYaw = false;
 	bUseControllerRotationRoll = false;
 
-	// --- Phase 5: overhead health bar ---
 	HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidgetComponent"));
-	HealthBarWidgetComponent->SetupAttachment(RootComponent); // Capsule component
+	HealthBarWidgetComponent->SetupAttachment(RootComponent); 
 	HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidgetComponent->SetDrawSize(FVector2D(90.f, 12.f));
 	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 110.f));

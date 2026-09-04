@@ -26,12 +26,11 @@ ACentralTowerBase::ACentralTowerBase()
 	TowerMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	TowerMesh->SetCollisionProfileName(TEXT("BlockAll"));
 
-	// --- Phase 5: overhead health bar ---
 	HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidgetComponent"));
 	HealthBarWidgetComponent->SetupAttachment(RootComponent);
 	HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidgetComponent->SetDrawSize(FVector2D(160.f, 20.f));
-	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 230.f)); // taller mesh (scale Z=4)
+	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 230.f)); 
 	HealthBarWidgetComponent->SetTickWhenOffscreen(false);
 
 	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarWidgetAsset(TEXT("/Game/UI/WBP_HealthBar"));
@@ -57,7 +56,6 @@ void ACentralTowerBase::BeginPlay()
 		}
 	}
 
-	// Self-register so WBP_TDHUD can find this tower without manual wiring.
 	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
 	{
 		GS->RegisterCentralTower(this);

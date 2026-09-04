@@ -20,7 +20,6 @@ public:
 protected:
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	// Implement in the WBP as a UMG Animation named "FlashRed" played from this event.
 	UFUNCTION(BlueprintImplementableEvent, Category = "Health")
 	void PlayDamageFlash();
 

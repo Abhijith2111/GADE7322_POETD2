@@ -31,7 +31,7 @@ void UPauseMenuWidget::OnResumeClicked()
 
 void UPauseMenuWidget::OnRestartClicked()
 {
-	UGameplayStatics::SetGamePaused(GetWorld(), false); // unpause BEFORE traveling, or the load can hang
+	UGameplayStatics::SetGamePaused(GetWorld(), false); 
 
 	if (GetWorld())
 	{

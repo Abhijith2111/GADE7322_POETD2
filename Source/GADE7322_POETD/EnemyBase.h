@@ -68,7 +68,6 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const;
 
-	// IHealthDisplayInterface
 	virtual float GetDisplayHealthPercent_Implementation() const override { return GetHealthPercent(); }
 	virtual bool IsUnitDestroyed_Implementation() const override { return IsDefeated(); }
 

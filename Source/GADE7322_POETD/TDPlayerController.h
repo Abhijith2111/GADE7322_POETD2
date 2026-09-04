@@ -54,7 +54,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Upgrade")
 	FOnDefenderUpgraded OnDefenderUpgraded;
 
-	// --- Phase 5: UI ---
 	UPROPERTY(EditDefaultsOnly, Category = "UI")
 	TSubclassOf<class UTDHUDWidget> HUDWidgetClass;
 
@@ -73,6 +72,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void SetPendingDefender(TSubclassOf<ADefenderBase> InClass, int32 InCost);
 
+	
+
 	UFUNCTION(BlueprintPure, Category = "Placement")
 	bool CanAffordCost(int32 Cost) const { return HasEnoughMoney(Cost); }
 
@@ -85,6 +86,8 @@ private:
 
 	UPROPERTY()
 	class UTDHUDWidget* HUDWidgetInstance;
+
+	
 
 	UPROPERTY()
 	class UPauseMenuWidget* PauseMenuInstance;
