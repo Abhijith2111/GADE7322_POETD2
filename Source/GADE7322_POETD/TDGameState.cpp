@@ -1,4 +1,5 @@
 #include "TDGameState.h"
+#include "CentralTowerBase.h"
 
 ATDGameState::ATDGameState()
 {
@@ -58,4 +59,14 @@ bool ATDGameState::CanAfford(int32 Amount) const
 int32 ATDGameState::GetCurrentMoney() const
 {
 	return PlayerMoney;
+}
+
+void ATDGameState::RegisterCentralTower(ACentralTowerBase* InTower)
+{
+	CentralTowerRef = InTower;
+}
+
+ACentralTowerBase* ATDGameState::GetCentralTower() const
+{
+	return CentralTowerRef.Get();
 }

@@ -1,6 +1,8 @@
 #include "TDPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/EngineTypes.h"
+#include "TDHUDWidget.h"
+#include "PauseMenuWidget.h"
 
 void ATDPlayerController::BeginPlay()
 {
@@ -11,6 +13,16 @@ void ATDPlayerController::BeginPlay()
 	bEnableMouseOverEvents = true;
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
+
+	// --- Phase 5: HUD ---
+	if (HUDWidgetClass)
+	{
+		HUDWidgetInstance = CreateWidget<UTDHUDWidget>(this, HUDWidgetClass);
+		if (HUDWidgetInstance)
+		{
+			HUDWidgetInstance->AddToViewport(0);
+		}
+	}
 }
 
 void ATDPlayerController::SetupInputComponent()
@@ -21,6 +33,7 @@ void ATDPlayerController::SetupInputComponent()
 	{
 		InputComponent->BindAction(TEXT("PlaceDefender"), IE_Pressed, this, &ATDPlayerController::TryPlaceDefender);
 		InputComponent->BindAction(TEXT("UpgradeDefender"), IE_Pressed, this, &ATDPlayerController::TryUpgradeDefender);
+		InputComponent->BindAction(TEXT("PauseGame"), IE_Pressed, this, &ATDPlayerController::TogglePauseMenu);
 	}
 }
 
@@ -234,4 +247,54 @@ void ATDPlayerController::TryUpgradeDefender()
 		NewLevel, ClickedDefender->MaxHealth, ClickedDefender->AttackDamage);
 
 	OnDefenderUpgraded.Broadcast(ClickedDefender, NewLevel);
+}
+
+// --- Phase 5: UI ---
+void ATDPlayerController::TogglePauseMenu()
+{
+	bIsPaused = !bIsPaused;
+
+	if (bIsPaused)
+	{
+		if (PauseMenuWidgetClass && !IsValid(PauseMenuInstance))
+		{
+			PauseMenuInstance = CreateWidget<UPauseMenuWidget>(this, PauseMenuWidgetClass);
+		}
+
+		if (IsValid(PauseMenuInstance) && !PauseMenuInstance->IsInViewport())
+		{
+			PauseMenuInstance->AddToViewport(10); // above the HUD
+		}
+
+		UGameplayStatics::SetGamePaused(GetWorld(), true);
+
+		FInputModeGameAndUI InputMode;
+		if (IsValid(PauseMenuInstance))
+		{
+			InputMode.SetWidgetToFocus(PauseMenuInstance->TakeWidget());
+		}
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+	}
+	else
+	{
+		if (IsValid(PauseMenuInstance) && PauseMenuInstance->IsInViewport())
+		{
+			PauseMenuInstance->RemoveFromParent();
+		}
+
+		UGameplayStatics::SetGamePaused(GetWorld(), false);
+
+		FInputModeGameOnly InputMode;
+		SetInputMode(InputMode);
+	}
+
+	// bShowMouseCursor stays true throughout — this game needs the cursor for
+	// defender placement/upgrading even during normal (unpaused) play.
+}
+
+void ATDPlayerController::SetPendingDefender(TSubclassOf<ADefenderBase> InClass, int32 InCost)
+{
+	DefenderClass = InClass;
+	DefenderCost = InCost;
 }

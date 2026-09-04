@@ -54,11 +54,27 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Upgrade")
 	FOnDefenderUpgraded OnDefenderUpgraded;
 
+	// --- Phase 5: UI ---
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UTDHUDWidget> HUDWidgetClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "UI")
+	TSubclassOf<class UPauseMenuWidget> PauseMenuWidgetClass;
+
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void TryPlaceDefender();
 
 	UFUNCTION(BlueprintCallable, Category = "Upgrade")
 	void TryUpgradeDefender();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void TogglePauseMenu();
+
+	UFUNCTION(BlueprintCallable, Category = "Placement")
+	void SetPendingDefender(TSubclassOf<ADefenderBase> InClass, int32 InCost);
+
+	UFUNCTION(BlueprintPure, Category = "Placement")
+	bool CanAffordCost(int32 Cost) const { return HasEnoughMoney(Cost); }
 
 private:
 	UPROPERTY()
@@ -66,6 +82,14 @@ private:
 
 	TSet<int32> OccupiedGridIndices;
 	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;
+
+	UPROPERTY()
+	class UTDHUDWidget* HUDWidgetInstance;
+
+	UPROPERTY()
+	class UPauseMenuWidget* PauseMenuInstance;
+
+	bool bIsPaused = false;
 
 	ATDGameState* GetGameState() const;
 	bool HasEnoughMoney(int32 Cost) const;

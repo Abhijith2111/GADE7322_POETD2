@@ -3,7 +3,11 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
+#include "Components/WidgetComponent.h"
+#include "Blueprint/UserWidget.h"
+#include "HealthBarWidget.h"
 #include "EnemyBase.h"
+#include "TDGameState.h"
 
 ACentralTowerBase::ACentralTowerBase()
 {
@@ -21,6 +25,20 @@ ACentralTowerBase::ACentralTowerBase()
 
 	TowerMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	TowerMesh->SetCollisionProfileName(TEXT("BlockAll"));
+
+	// --- Phase 5: overhead health bar ---
+	HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidgetComponent"));
+	HealthBarWidgetComponent->SetupAttachment(RootComponent);
+	HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidgetComponent->SetDrawSize(FVector2D(160.f, 20.f));
+	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 230.f)); // taller mesh (scale Z=4)
+	HealthBarWidgetComponent->SetTickWhenOffscreen(false);
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarWidgetAsset(TEXT("/Game/UI/WBP_HealthBar"));
+	if (HealthBarWidgetAsset.Succeeded())
+	{
+		HealthBarWidgetComponent->SetWidgetClass(HealthBarWidgetAsset.Class);
+	}
 }
 
 void ACentralTowerBase::BeginPlay()
@@ -30,6 +48,20 @@ void ACentralTowerBase::BeginPlay()
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+
+	if (HealthBarWidgetComponent)
+	{
+		if (UHealthBarWidget* HealthWidget = Cast<UHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
+		{
+			HealthWidget->InitializeWithOwner(this);
+		}
+	}
+
+	// Self-register so WBP_TDHUD can find this tower without manual wiring.
+	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
+	{
+		GS->RegisterCentralTower(this);
+	}
 
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, AttackInterval, true, 0.5f);
 }

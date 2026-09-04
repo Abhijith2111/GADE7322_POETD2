@@ -2,16 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "HealthDisplayInterface.h"
 #include "EnemyBase.generated.h"
-
-class ADefenderBase;
-class ACentralTowerBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyDestroyed, int32, RewardAmount);
 
 UCLASS()
-class GADE7322_POETD_API AEnemyBase : public ACharacter
+class GADE7322_POETD_API AEnemyBase : public ACharacter, public IHealthDisplayInterface
 {
 	GENERATED_BODY()
 
@@ -24,6 +22,9 @@ protected:
 public:
 	virtual void Tick(float DeltaTime) override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
+	class UWidgetComponent* HealthBarWidgetComponent;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Health", meta = (ClampMin = "1.0"))
 	float MaxHealth = 100.f;
@@ -64,6 +65,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsDefeated() const;
 
+	UFUNCTION(BlueprintPure, Category = "Health")
+	float GetHealthPercent() const;
+
+	// IHealthDisplayInterface
+	virtual float GetDisplayHealthPercent_Implementation() const override { return GetHealthPercent(); }
+	virtual bool IsUnitDestroyed_Implementation() const override { return IsDefeated(); }
+
 private:
 	TArray<FVector> Waypoints;
 	int32 CurrentWaypointIndex = 0;
@@ -73,8 +81,7 @@ private:
 
 	FTimerHandle AttackTimerHandle;
 
-	ADefenderBase* FindNearestDefenderInRange() const;
-	ACentralTowerBase* FindCentralTower() const;
+	AActor* FindNearestAttackTarget() const;
 	void ExecuteAttack();
 	void HandleDeath();
 };
