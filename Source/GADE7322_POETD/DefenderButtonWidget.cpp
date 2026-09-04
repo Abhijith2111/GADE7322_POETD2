@@ -9,7 +9,9 @@ void UDefenderButtonWidget::NativeConstruct()
 
 	if (CostText)
 	{
-		CostText->SetText(FText::AsNumber(Cost));
+		CostText->SetText(FText::Format(
+			NSLOCTEXT("UI", "CostFormat", "{0} coins"),
+			FText::AsNumber(Cost)));
 	}
 	if (PurchaseButton)
 	{
@@ -40,9 +42,8 @@ void UDefenderButtonWidget::OnPurchaseClicked()
 
 	if (!PC->CanAffordCost(Cost))
 	{
-		return; // Button should already be disabled, but double-check defensively.
+		return; 
 	}
 
-	// Arms placement — the next world click ("PlaceDefender") spawns this type.
 	PC->SetPendingDefender(DefenderClassToBuild, Cost);
 }
