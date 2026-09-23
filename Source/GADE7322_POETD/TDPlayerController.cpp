@@ -53,7 +53,10 @@ void ATDPlayerController::TogglePause()
 		}
 
 		FInputModeGameAndUI InputMode;
-		InputMode.SetWidgetToFocus(PauseMenuInstance ? PauseMenuInstance->TakeWidget() : nullptr);
+		if (PauseMenuInstance)
+		{
+			InputMode.SetWidgetToFocus(PauseMenuInstance->TakeWidget());
+		}
 		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
 		SetInputMode(InputMode);
 		bShowMouseCursor = true;
@@ -71,6 +74,23 @@ void ATDPlayerController::TogglePause()
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("TDPlayerController: Game %s"), bIsPaused ? TEXT("paused") : TEXT("resumed"));
+}
+
+bool ATDPlayerController::CanAffordCost(int32 Cost) const
+{
+	return HasEnoughMoney(Cost);
+}
+
+void ATDPlayerController::SetPendingDefender(TSubclassOf<ADefenderBase> InDefenderClass, int32 InCost)
+{
+	DefenderClass = InDefenderClass;
+	DefenderCost = InCost;
+	UE_LOG(LogTemp, Log, TEXT("TDPlayerController: Pending defender set. Cost: %d"), InCost);
+}
+
+void ATDPlayerController::TogglePauseMenu()
+{
+	TogglePause();
 }
 
 ATDGameState* ATDPlayerController::GetGameState() const

@@ -70,6 +70,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void TogglePause();
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	bool CanAffordCost(int32 Cost) const;
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void SetPendingDefender(TSubclassOf<ADefenderBase> InDefenderClass, int32 InCost);
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void TogglePauseMenu();
+
 private:
 	UPROPERTY()
 	AProceduralTerrain* TerrainRef;
