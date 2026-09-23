@@ -5,6 +5,7 @@
 #include "DefenderBase.h"
 #include "ProceduralTerrain.h"
 #include "TDGameState.h"
+#include "Blueprint/UserWidget.h"
 #include "TDPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
@@ -45,6 +46,12 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Upgrade")
 	float UpgradeDamageBonus = 5.f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> PauseMenuClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> HUDClass;
+
 	UPROPERTY(BlueprintAssignable, Category = "Placement")
 	FOnDefenderPlacementSucceeded OnDefenderPlacementSucceeded;
 
@@ -54,12 +61,6 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Upgrade")
 	FOnDefenderUpgraded OnDefenderUpgraded;
 
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<class UTDHUDWidget> HUDWidgetClass;
-
-	UPROPERTY(EditDefaultsOnly, Category = "UI")
-	TSubclassOf<class UPauseMenuWidget> PauseMenuWidgetClass;
-
 	UFUNCTION(BlueprintCallable, Category = "Placement")
 	void TryPlaceDefender();
 
@@ -67,32 +68,22 @@ public:
 	void TryUpgradeDefender();
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
-	void TogglePauseMenu();
-
-	UFUNCTION(BlueprintCallable, Category = "Placement")
-	void SetPendingDefender(TSubclassOf<ADefenderBase> InClass, int32 InCost);
-
-	
-
-	UFUNCTION(BlueprintPure, Category = "Placement")
-	bool CanAffordCost(int32 Cost) const { return HasEnoughMoney(Cost); }
+	void TogglePause();
 
 private:
 	UPROPERTY()
 	AProceduralTerrain* TerrainRef;
 
-	TSet<int32> OccupiedGridIndices;
-	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;
+	UPROPERTY()
+	UUserWidget* PauseMenuInstance;
 
 	UPROPERTY()
-	class UTDHUDWidget* HUDWidgetInstance;
-
-	
-
-	UPROPERTY()
-	class UPauseMenuWidget* PauseMenuInstance;
+	UUserWidget* HUDInstance;
 
 	bool bIsPaused = false;
+
+	TSet<int32> OccupiedGridIndices;
+	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;
 
 	ATDGameState* GetGameState() const;
 	bool HasEnoughMoney(int32 Cost) const;

@@ -3,9 +3,6 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
-#include "Components/WidgetComponent.h"
-#include "Blueprint/UserWidget.h"
-#include "HealthBarWidget.h"
 #include "EnemyBase.h"
 
 ADefenderBase::ADefenderBase()
@@ -25,18 +22,11 @@ ADefenderBase::ADefenderBase()
 	DefenderMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	DefenderMesh->SetCollisionProfileName(TEXT("BlockAll"));
 
-	HealthBarWidgetComponent = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidgetComponent"));
-	HealthBarWidgetComponent->SetupAttachment(RootComponent);
-	HealthBarWidgetComponent->SetWidgetSpace(EWidgetSpace::Screen);
-	HealthBarWidgetComponent->SetDrawSize(FVector2D(100.f, 14.f));
-	HealthBarWidgetComponent->SetRelativeLocation(FVector(0.f, 0.f, 110.f));
-	HealthBarWidgetComponent->SetTickWhenOffscreen(false);
-
-	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarWidgetAsset(TEXT("/Game/UI/WBP_HealthBar"));
-	if (HealthBarWidgetAsset.Succeeded())
-	{
-		HealthBarWidgetComponent->SetWidgetClass(HealthBarWidgetAsset.Class);
-	}
+	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
+	HealthBarWidget->SetupAttachment(RootComponent);
+	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
+	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	HealthBarWidget->SetDrawSize(FVector2D(120.f, 15.f));
 }
 
 void ADefenderBase::BeginPlay()
@@ -46,14 +36,6 @@ void ADefenderBase::BeginPlay()
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-
-	if (HealthBarWidgetComponent)
-	{
-		if (UHealthBarWidget* HealthWidget = Cast<UHealthBarWidget>(HealthBarWidgetComponent->GetUserWidgetObject()))
-		{
-			HealthWidget->InitializeWithOwner(this);
-		}
-	}
 
 	const float InitialDelay = FMath::FRandRange(0.f, AttackInterval);
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ADefenderBase::ScanAndAttack, AttackInterval, true, InitialDelay);

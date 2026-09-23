@@ -2,14 +2,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "HealthDisplayInterface.h"
+#include "Components/WidgetComponent.h"
 #include "CentralTowerBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCentralTowerHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCentralTowerDestroyed);
 
 UCLASS()
-class GADE7322_POETD_API ACentralTowerBase : public AActor, public IHealthDisplayInterface
+class GADE7322_POETD_API ACentralTowerBase : public AActor
 {
 	GENERATED_BODY()
 
@@ -24,8 +24,8 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* TowerMesh;
 
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "UI")
-	class UWidgetComponent* HealthBarWidgetComponent;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UWidgetComponent* HealthBarWidget;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Health", meta = (ClampMin = "1.0"))
 	float MaxHealth = 500.f;
@@ -56,9 +56,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const;
-
-	virtual float GetDisplayHealthPercent_Implementation() const override { return GetHealthPercent(); }
-	virtual bool IsUnitDestroyed_Implementation() const override { return IsDestroyed(); }
 
 private:
 	bool bIsDestroyed = false;
