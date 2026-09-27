@@ -66,5 +66,7 @@ private:
 	void SetGamePhase(EGamePhase NewPhase);
 	void MonitorCentralTower();
 	void BindToCentralTower();
+
+	UFUNCTION()
 	void HandleCentralTowerDestroyed();
 };

@@ -20,6 +20,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	static void BindToWidgetComponent(UWidgetComponent* Comp, AActor* Owner);
 
+	static void ConfigureComponent(UWidgetComponent* Comp, const FVector& RelativeOffset, const FVector2D& DrawSize);
+
 	/** Prefers Content/UI/WBP_HealthBar; falls back to this C++ class. */
 	static TSubclassOf<UUserWidget> GetPreferredWidgetClass();
 

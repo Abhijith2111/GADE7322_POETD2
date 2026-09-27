@@ -3,6 +3,7 @@
 #include "Components/SizeBox.h"
 #include "Components/WidgetComponent.h"
 #include "Blueprint/WidgetTree.h"
+#include "UObject/ConstructorHelpers.h"
 
 void UHealthBarWidget::InitializeWithOwner(AActor* InOwner)
 {
@@ -43,12 +44,43 @@ TSubclassOf<UUserWidget> UHealthBarWidget::GetPreferredWidgetClass()
 	return CachedClass;
 }
 
+void UHealthBarWidget::ConfigureComponent(UWidgetComponent* Comp, const FVector& RelativeOffset, const FVector2D& DrawSize)
+{
+	if (!Comp)
+	{
+		return;
+	}
+
+	Comp->SetRelativeLocation(RelativeOffset);
+	Comp->SetWidgetSpace(EWidgetSpace::Screen);
+	Comp->SetDrawAtDesiredSize(false);
+	Comp->SetDrawSize(DrawSize);
+	Comp->SetPivot(FVector2D(0.5f, 1.f));
+	Comp->SetTwoSided(true);
+	Comp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	Comp->SetHiddenInGame(false);
+	Comp->SetVisibility(true);
+	Comp->SetTickWhenOffscreen(true);
+
+	TSubclassOf<UUserWidget> HealthBarClass = StaticClass();
+	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
+	if (HealthBarBP.Succeeded())
+	{
+		HealthBarClass = HealthBarBP.Class;
+	}
+	Comp->SetWidgetClass(HealthBarClass);
+}
+
 void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Owner)
 {
 	if (!IsValid(Comp) || !IsValid(Owner))
 	{
 		return;
 	}
+
+	Comp->SetHiddenInGame(false);
+	Comp->SetVisibility(true);
+	Comp->SetDrawAtDesiredSize(false);
 
 	const TSubclassOf<UUserWidget> PreferredClass = GetPreferredWidgetClass();
 	if (Comp->GetWidgetClass() != PreferredClass)
@@ -57,18 +89,22 @@ void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Own
 	}
 
 	Comp->InitWidget();
+	Comp->RequestRedraw();
 
 	if (UHealthBarWidget* Bar = Cast<UHealthBarWidget>(Comp->GetUserWidgetObject()))
 	{
 		Bar->InitializeWithOwner(Owner);
+		Bar->SetVisibility(ESlateVisibility::HitTestInvisible);
 		return;
 	}
 
 	Comp->SetWidgetClass(TSubclassOf<UUserWidget>(StaticClass()));
 	Comp->InitWidget();
+	Comp->RequestRedraw();
 	if (UHealthBarWidget* Bar = Cast<UHealthBarWidget>(Comp->GetUserWidgetObject()))
 	{
 		Bar->InitializeWithOwner(Owner);
+		Bar->SetVisibility(ESlateVisibility::HitTestInvisible);
 	}
 }
 
@@ -162,17 +198,23 @@ void UHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 
 	UpdateDamageFlash(InDeltaTime);
 
+	if (!HealthProgressBar)
+	{
+		EnsureDefaultLayout();
+	}
+
 	AActor* Owner = OwningActor.Get();
-	if (!IsValid(Owner) || !HealthProgressBar)
+	if (!IsValid(Owner))
 	{
 		if (!OwningActor.IsValid())
 		{
 			TryAutoBindOwner();
 		}
-		if (!OwningActor.IsValid())
-		{
-			SetVisibility(ESlateVisibility::Collapsed);
-		}
+		return;
+	}
+
+	if (!HealthProgressBar)
+	{
 		return;
 	}
 

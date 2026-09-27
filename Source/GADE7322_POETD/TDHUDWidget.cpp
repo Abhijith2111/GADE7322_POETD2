@@ -123,8 +123,16 @@ void UTDHUDWidget::EnsureDefenderButton()
 		return;
 	}
 
-	APlayerController* PC = GetOwningPlayer();
-	UDefenderButtonWidget* BuyBtn = CreateWidget<UDefenderButtonWidget>(PC ? static_cast<UObject*>(PC) : static_cast<UObject*>(this), UDefenderButtonWidget::StaticClass());
+	UDefenderButtonWidget* BuyBtn = nullptr;
+	if (APlayerController* PC = GetOwningPlayer())
+	{
+		BuyBtn = CreateWidget<UDefenderButtonWidget>(PC);
+	}
+	else
+	{
+		BuyBtn = CreateWidget<UDefenderButtonWidget>(this);
+	}
+
 	if (!BuyBtn)
 	{
 		return;

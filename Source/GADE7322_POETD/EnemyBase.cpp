@@ -31,17 +31,7 @@ AEnemyBase::AEnemyBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
-	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	HealthBarWidget->SetDrawSize(FVector2D(100.f, 12.f));
-
-	TSubclassOf<UUserWidget> HealthBarClass = UHealthBarWidget::StaticClass();
-	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
-	if (HealthBarBP.Succeeded())
-	{
-		HealthBarClass = HealthBarBP.Class;
-	}
-	HealthBarWidget->SetWidgetClass(HealthBarClass);
+	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 120.f), FVector2D(140.f, 18.f));
 }
 
 void AEnemyBase::BeginPlay()

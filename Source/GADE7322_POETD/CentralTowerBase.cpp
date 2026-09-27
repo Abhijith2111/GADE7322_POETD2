@@ -26,17 +26,7 @@ ACentralTowerBase::ACentralTowerBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 500.f));
-	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	HealthBarWidget->SetDrawSize(FVector2D(220.f, 28.f));
-
-	TSubclassOf<UUserWidget> HealthBarClass = UHealthBarWidget::StaticClass();
-	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
-	if (HealthBarBP.Succeeded())
-	{
-		HealthBarClass = HealthBarBP.Class;
-	}
-	HealthBarWidget->SetWidgetClass(HealthBarClass);
+	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 500.f), FVector2D(220.f, 28.f));
 }
 
 void ACentralTowerBase::BeginPlay()
