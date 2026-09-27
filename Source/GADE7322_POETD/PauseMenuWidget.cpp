@@ -22,27 +22,29 @@ void UPauseMenuWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	EnsureDefaultLayout();
+
+	if (ResumeButton)
+	{
+		ResumeButton->OnClicked.RemoveDynamic(this, &UPauseMenuWidget::OnResumeClicked);
+		ResumeButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnResumeClicked);
+	}
+	if (RestartButton)
+	{
+		RestartButton->OnClicked.RemoveDynamic(this, &UPauseMenuWidget::OnRestartClicked);
+		RestartButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnRestartClicked);
+	}
+	if (QuitToMenuButton)
+	{
+		QuitToMenuButton->OnClicked.RemoveDynamic(this, &UPauseMenuWidget::OnQuitToMenuClicked);
+		QuitToMenuButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnQuitToMenuClicked);
+	}
 }
 
 void UPauseMenuWidget::NativeConstruct()
 {
 	EnsureDefaultLayout();
 	Super::NativeConstruct();
-
 	SetIsFocusable(true);
-
-	if (ResumeButton)
-	{
-		ResumeButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnResumeClicked);
-	}
-	if (RestartButton)
-	{
-		RestartButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnRestartClicked);
-	}
-	if (QuitToMenuButton)
-	{
-		QuitToMenuButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnQuitToMenuClicked);
-	}
 }
 
 void UPauseMenuWidget::EnsureDefaultLayout()
@@ -97,7 +99,7 @@ void UPauseMenuWidget::OnResumeClicked()
 {
 	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
 	{
-		PC->TogglePauseMenu();
+		PC->ResumeFromPause();
 	}
 }
 
