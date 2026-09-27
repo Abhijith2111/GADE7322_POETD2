@@ -3,7 +3,8 @@
 #include "Components/SizeBox.h"
 #include "Components/WidgetComponent.h"
 #include "Blueprint/WidgetTree.h"
-#include "UObject/ConstructorHelpers.h"
+#include "Camera/PlayerCameraManager.h"
+#include "GameFramework/PlayerController.h"
 
 void UHealthBarWidget::InitializeWithOwner(AActor* InOwner)
 {
@@ -30,20 +31,6 @@ void UHealthBarWidget::InitializeWithOwner(AActor* InOwner)
 	SetVisibility(ESlateVisibility::HitTestInvisible);
 }
 
-TSubclassOf<UUserWidget> UHealthBarWidget::GetPreferredWidgetClass()
-{
-	static TSubclassOf<UUserWidget> CachedClass;
-	if (!CachedClass)
-	{
-		CachedClass = LoadClass<UUserWidget>(nullptr, TEXT("/Game/UI/WBP_HealthBar.WBP_HealthBar_C"));
-		if (!CachedClass)
-		{
-			CachedClass = StaticClass();
-		}
-	}
-	return CachedClass;
-}
-
 void UHealthBarWidget::ConfigureComponent(UWidgetComponent* Comp, const FVector& RelativeOffset, const FVector2D& DrawSize)
 {
 	if (!Comp)
@@ -52,7 +39,7 @@ void UHealthBarWidget::ConfigureComponent(UWidgetComponent* Comp, const FVector&
 	}
 
 	Comp->SetRelativeLocation(RelativeOffset);
-	Comp->SetWidgetSpace(EWidgetSpace::Screen);
+	Comp->SetWidgetSpace(EWidgetSpace::World);
 	Comp->SetDrawAtDesiredSize(false);
 	Comp->SetDrawSize(DrawSize);
 	Comp->SetPivot(FVector2D(0.5f, 1.f));
@@ -61,14 +48,35 @@ void UHealthBarWidget::ConfigureComponent(UWidgetComponent* Comp, const FVector&
 	Comp->SetHiddenInGame(false);
 	Comp->SetVisibility(true);
 	Comp->SetTickWhenOffscreen(true);
+	Comp->SetBlendMode(EWidgetBlendMode::Transparent);
+	Comp->SetWidgetClass(StaticClass());
+}
 
-	TSubclassOf<UUserWidget> HealthBarClass = StaticClass();
-	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
-	if (HealthBarBP.Succeeded())
+void UHealthBarWidget::OrientComponentTowardCamera(UWidgetComponent* Comp)
+{
+	if (!IsValid(Comp))
 	{
-		HealthBarClass = HealthBarBP.Class;
+		return;
 	}
-	Comp->SetWidgetClass(HealthBarClass);
+
+	UWorld* World = Comp->GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	APlayerController* PC = World->GetFirstPlayerController();
+	if (!PC || !PC->PlayerCameraManager)
+	{
+		return;
+	}
+
+	const FVector CameraLocation = PC->PlayerCameraManager->GetCameraLocation();
+	const FVector ToCamera = CameraLocation - Comp->GetComponentLocation();
+	if (!ToCamera.IsNearlyZero())
+	{
+		Comp->SetWorldRotation(ToCamera.GetSafeNormal().Rotation());
+	}
 }
 
 void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Owner)
@@ -81,13 +89,8 @@ void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Own
 	Comp->SetHiddenInGame(false);
 	Comp->SetVisibility(true);
 	Comp->SetDrawAtDesiredSize(false);
-
-	const TSubclassOf<UUserWidget> PreferredClass = GetPreferredWidgetClass();
-	if (Comp->GetWidgetClass() != PreferredClass)
-	{
-		Comp->SetWidgetClass(PreferredClass);
-	}
-
+	Comp->SetWidgetSpace(EWidgetSpace::World);
+	Comp->SetWidgetClass(StaticClass());
 	Comp->InitWidget();
 	Comp->RequestRedraw();
 
@@ -95,17 +98,9 @@ void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Own
 	{
 		Bar->InitializeWithOwner(Owner);
 		Bar->SetVisibility(ESlateVisibility::HitTestInvisible);
-		return;
 	}
 
-	Comp->SetWidgetClass(TSubclassOf<UUserWidget>(StaticClass()));
-	Comp->InitWidget();
-	Comp->RequestRedraw();
-	if (UHealthBarWidget* Bar = Cast<UHealthBarWidget>(Comp->GetUserWidgetObject()))
-	{
-		Bar->InitializeWithOwner(Owner);
-		Bar->SetVisibility(ESlateVisibility::HitTestInvisible);
-	}
+	OrientComponentTowardCamera(Comp);
 }
 
 TSharedRef<SWidget> UHealthBarWidget::RebuildWidget()
@@ -174,6 +169,26 @@ void UHealthBarWidget::TryAutoBindOwner()
 	}
 }
 
+void UHealthBarWidget::FaceOwnerBarTowardCamera()
+{
+	AActor* Owner = OwningActor.Get();
+	if (!IsValid(Owner))
+	{
+		return;
+	}
+
+	TArray<UWidgetComponent*> Components;
+	Owner->GetComponents<UWidgetComponent>(Components);
+	for (UWidgetComponent* Comp : Components)
+	{
+		if (Comp && Comp->GetUserWidgetObject() == this)
+		{
+			OrientComponentTowardCamera(Comp);
+			return;
+		}
+	}
+}
+
 void UHealthBarWidget::PlayDamageFlash_Implementation()
 {
 	DamageFlashRemaining = 0.25f;
@@ -197,6 +212,7 @@ void UHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
 	UpdateDamageFlash(InDeltaTime);
+	FaceOwnerBarTowardCamera();
 
 	if (!HealthProgressBar)
 	{

@@ -6,6 +6,8 @@
 #include "HealthDisplayInterface.h"
 #include "CentralTowerBase.generated.h"
 
+class AEnemyBase;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCentralTowerHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCentralTowerDestroyed);
 
@@ -38,7 +40,7 @@ public:
 	float CurrentHealth;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.0"))
-	float AttackRange = 800.f;
+	float AttackRange = 1200.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.0"))
 	float AttackDamage = 20.f;
@@ -65,6 +67,9 @@ private:
 	bool bIsDestroyed = false;
 	FTimerHandle AttackTimerHandle;
 
+	UFUNCTION()
 	void ScanAndAttack();
-	AActor* FindNearestEnemy() const;
+
+	AEnemyBase* FindNearestEnemy() const;
+	float GetEffectiveAttackRange() const;
 };

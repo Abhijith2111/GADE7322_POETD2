@@ -22,8 +22,7 @@ public:
 
 	static void ConfigureComponent(UWidgetComponent* Comp, const FVector& RelativeOffset, const FVector2D& DrawSize);
 
-	/** Prefers Content/UI/WBP_HealthBar; falls back to this C++ class. */
-	static TSubclassOf<UUserWidget> GetPreferredWidgetClass();
+	static void OrientComponentTowardCamera(UWidgetComponent* Comp);
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	class UProgressBar* HealthProgressBar;
@@ -41,6 +40,7 @@ protected:
 	void EnsureDefaultLayout();
 	void TryAutoBindOwner();
 	void UpdateDamageFlash(float InDeltaTime);
+	void FaceOwnerBarTowardCamera();
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> OwningActor;

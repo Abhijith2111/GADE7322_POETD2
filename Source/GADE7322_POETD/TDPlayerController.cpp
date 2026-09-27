@@ -73,13 +73,22 @@ void ATDPlayerController::SetupInputComponent()
 
 void ATDPlayerController::TogglePause()
 {
+	SetPausedState(!bIsPaused);
+}
+
+void ATDPlayerController::ResumeFromPause()
+{
+	SetPausedState(false);
+}
+
+void ATDPlayerController::SetPausedState(bool bPause)
+{
 	if (GameOverInstance && GameOverInstance->IsInViewport())
 	{
 		return;
 	}
 
-	bIsPaused = !bIsPaused;
-
+	bIsPaused = bPause;
 	SetPause(bIsPaused);
 
 	if (bIsPaused)
@@ -91,7 +100,11 @@ void ATDPlayerController::TogglePause()
 
 		if (PauseMenuInstance)
 		{
-			PauseMenuInstance->AddToViewport(10);
+			if (!PauseMenuInstance->IsInViewport())
+			{
+				PauseMenuInstance->AddToViewport(10);
+			}
+			PauseMenuInstance->SetVisibility(ESlateVisibility::Visible);
 		}
 
 		FInputModeGameAndUI InputMode;
@@ -107,7 +120,7 @@ void ATDPlayerController::TogglePause()
 	{
 		if (PauseMenuInstance)
 		{
-			PauseMenuInstance->RemoveFromParent();
+			PauseMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
 		}
 
 		FInputModeGameAndUI InputMode;
@@ -333,10 +346,28 @@ void ATDPlayerController::TryPlaceDefender()
 
 	SpendMoney(DefenderCost);
 	OccupiedGridIndices.Add(GridIndex);
+	DefenderGridIndices.Add(NewDefender, GridIndex);
 	DefenderUpgradeLevels.Add(NewDefender, 0);
+	NewDefender->OnDefenderDestroyed.AddDynamic(this, &ATDPlayerController::HandleDefenderDestroyed);
 
 	UE_LOG(LogTemp, Log, TEXT("TDPlayerController: Placed defender at grid index %d."), GridIndex);
 	OnDefenderPlacementSucceeded.Broadcast(NewDefender);
+}
+
+void ATDPlayerController::HandleDefenderDestroyed(ADefenderBase* DestroyedDefender)
+{
+	if (!DestroyedDefender)
+	{
+		return;
+	}
+
+	if (const int32* GridIndex = DefenderGridIndices.Find(DestroyedDefender))
+	{
+		OccupiedGridIndices.Remove(*GridIndex);
+		DefenderGridIndices.Remove(DestroyedDefender);
+	}
+
+	DefenderUpgradeLevels.Remove(DestroyedDefender);
 }
 
 void ATDPlayerController::TryUpgradeDefender()

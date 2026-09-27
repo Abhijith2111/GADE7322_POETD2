@@ -25,7 +25,7 @@ ADefenderBase::ADefenderBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 150.f), FVector2D(140.f, 18.f));
+	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 100.f), FVector2D(56.f, 8.f));
 }
 
 void ADefenderBase::BeginPlay()
@@ -116,7 +116,11 @@ void ADefenderBase::ApplyDamage(float DamageAmount)
 	{
 		bIsDestroyed = true;
 		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-		OnDefenderDestroyed.Broadcast();
+		if (DefenderMesh)
+		{
+			DefenderMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		}
+		OnDefenderDestroyed.Broadcast(this);
 		SetLifeSpan(0.2f);
 	}
 }

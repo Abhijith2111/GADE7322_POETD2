@@ -7,7 +7,6 @@
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
 #include "HealthBarWidget.h"
-#include "UObject/ConstructorHelpers.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -31,7 +30,7 @@ AEnemyBase::AEnemyBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 120.f), FVector2D(140.f, 18.f));
+	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 90.f), FVector2D(120.f, 16.f));
 }
 
 void AEnemyBase::BeginPlay()
@@ -74,37 +73,28 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
-	ADefenderBase* NearestDefender = FindNearestDefenderInRange();
-	const bool bDefenderInRange = NearestDefender != nullptr;
-
-	if (bDefenderInRange)
-	{
-		DrawDebugLine(GetWorld(), GetActorLocation(), NearestDefender->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
-	}
+	ADefenderBase* AggroDefender = FindNearestDefender(AggroRange);
+	ADefenderBase* AttackDefender = FindNearestDefender(AttackRange);
 
 	ACentralTowerBase* Tower = FindCentralTower();
 	const bool bAtFinalWaypoint = CurrentWaypointIndex >= Waypoints.Num();
 	const bool bTowerInRange = Tower && bAtFinalWaypoint &&
 		FVector::Dist(GetActorLocation(), Tower->GetActorLocation()) <= AttackRange;
 
-	const bool bShouldAttack = bDefenderInRange || bTowerInRange;
+	if (AggroDefender)
+	{
+		DrawDebugLine(GetWorld(), GetActorLocation(), AggroDefender->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
+		UpdateCombatState(AttackDefender, false);
 
-	if (bShouldAttack)
-	{
-		if (!bIsAttacking)
+		if (!AttackDefender)
 		{
-			bIsAttacking = true;
-			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
+			const FVector ToDefender = AggroDefender->GetActorLocation() - GetActorLocation();
+			AddMovementInput(ToDefender.GetSafeNormal2D());
 		}
+		return;
 	}
-	else
-	{
-		if (bIsAttacking)
-		{
-			bIsAttacking = false;
-			GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-		}
-	}
+
+	UpdateCombatState(nullptr, bTowerInRange);
 
 	if (bAtFinalWaypoint)
 	{
@@ -126,19 +116,35 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
-	const FVector MoveDir = ToWaypoint.GetSafeNormal2D();
-	AddMovementInput(MoveDir);
-
+	AddMovementInput(ToWaypoint.GetSafeNormal2D());
 	DrawDebugSphere(GetWorld(), TargetWaypoint, 20.f, 6, FColor::Yellow, false, 0.05f);
 }
 
-ADefenderBase* AEnemyBase::FindNearestDefenderInRange() const
+void AEnemyBase::UpdateCombatState(ADefenderBase* AttackTarget, bool bCanAttackTower)
+{
+	const bool bShouldAttack = AttackTarget != nullptr || bCanAttackTower;
+	if (bShouldAttack)
+	{
+		if (!bIsAttacking)
+		{
+			bIsAttacking = true;
+			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
+		}
+	}
+	else if (bIsAttacking)
+	{
+		bIsAttacking = false;
+		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	}
+}
+
+ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 {
 	TArray<AActor*> Defenders;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderBase::StaticClass(), Defenders);
 
 	ADefenderBase* Nearest = nullptr;
-	float NearestDistSq = FMath::Square(AttackRange);
+	float NearestDistSq = FMath::Square(Range);
 
 	for (AActor* Actor : Defenders)
 	{
@@ -186,7 +192,7 @@ void AEnemyBase::ExecuteAttack()
 		return;
 	}
 
-	ADefenderBase* NearestDefender = FindNearestDefenderInRange();
+	ADefenderBase* NearestDefender = FindNearestDefender(AttackRange);
 	if (NearestDefender)
 	{
 		NearestDefender->ApplyDamage(AttackDamage);

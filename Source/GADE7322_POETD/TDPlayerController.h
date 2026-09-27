@@ -77,6 +77,9 @@ public:
 	void TogglePause();
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ResumeFromPause();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	bool CanAffordCost(int32 Cost) const;
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -100,6 +103,8 @@ private:
 
 	bool bIsPaused = false;
 
+	void SetPausedState(bool bPause);
+
 	UFUNCTION()
 	void HandleGameLoss();
 
@@ -109,7 +114,11 @@ private:
 	void ShowGameOver(bool bVictory);
 
 	TSet<int32> OccupiedGridIndices;
+	TMap<ADefenderBase*, int32> DefenderGridIndices;
 	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;
+
+	UFUNCTION()
+	void HandleDefenderDestroyed(ADefenderBase* DestroyedDefender);
 
 	ATDGameState* GetGameState() const;
 	bool HasEnoughMoney(int32 Cost) const;

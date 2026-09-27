@@ -46,6 +46,9 @@ public:
 	float AttackRange = 120.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.0"))
+	float AggroRange = 500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.0"))
 	float AttackDamage = 15.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.05"))
@@ -81,8 +84,9 @@ private:
 
 	FTimerHandle AttackTimerHandle;
 
-	ADefenderBase* FindNearestDefenderInRange() const;
+	ADefenderBase* FindNearestDefender(float Range) const;
 	ACentralTowerBase* FindCentralTower() const;
+	void UpdateCombatState(ADefenderBase* AttackTarget, bool bCanAttackTower);
 	void ExecuteAttack();
 	void HandleDeath();
 };

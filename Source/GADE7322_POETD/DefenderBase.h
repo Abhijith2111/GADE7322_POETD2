@@ -6,8 +6,10 @@
 #include "HealthDisplayInterface.h"
 #include "DefenderBase.generated.h"
 
+class ADefenderBase;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDefenderHealthChanged, float, NewHealth, float, InMaxHealth);
-DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDefenderDestroyed);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderDestroyed, ADefenderBase*, DestroyedDefender);
 
 UCLASS()
 class GADE7322_POETD_API ADefenderBase : public AActor, public IHealthDisplayInterface

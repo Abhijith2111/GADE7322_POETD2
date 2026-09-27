@@ -26,7 +26,7 @@ ACentralTowerBase::ACentralTowerBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 500.f), FVector2D(220.f, 28.f));
+	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 320.f), FVector2D(220.f, 28.f));
 }
 
 void ACentralTowerBase::BeginPlay()
@@ -43,7 +43,8 @@ void ACentralTowerBase::BeginPlay()
 		GS->RegisterCentralTower(this);
 	}
 
-	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, AttackInterval, true, 0.5f);
+	const float Interval = FMath::Max(AttackInterval, 0.05f);
+	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, Interval, true, 0.1f);
 }
 
 void ACentralTowerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -59,34 +60,44 @@ void ACentralTowerBase::ScanAndAttack()
 		return;
 	}
 
-	AActor* Target = FindNearestEnemy();
-	if (!Target)
+	AEnemyBase* Enemy = FindNearestEnemy();
+	if (!Enemy)
 	{
 		return;
 	}
 
-	AEnemyBase* Enemy = Cast<AEnemyBase>(Target);
-	if (Enemy)
+	const float Damage = FMath::Max(AttackDamage, 1.f);
+	Enemy->TakeDamageFromDefender(Damage);
+
+	if (UWorld* World = GetWorld())
 	{
-		Enemy->TakeDamageFromDefender(AttackDamage);
-
-		UWorld* World = GetWorld();
-		if (World)
-		{
-			DrawDebugLine(World, GetActorLocation(), Enemy->GetActorLocation(), FColor::Cyan, false, AttackInterval * 0.5f, 0, 4.f);
-		}
-
-		UE_LOG(LogTemp, Log, TEXT("CentralTower attacked %s for %.1f damage"), *Enemy->GetName(), AttackDamage);
+		DrawDebugLine(World, GetActorLocation(), Enemy->GetActorLocation(), FColor::Cyan, false, 0.35f, 0, 6.f);
 	}
+
+	UE_LOG(LogTemp, Log, TEXT("CentralTower attacked %s for %.1f damage"), *Enemy->GetName(), Damage);
 }
 
-AActor* ACentralTowerBase::FindNearestEnemy() const
+float ACentralTowerBase::GetEffectiveAttackRange() const
+{
+	float Range = AttackRange > 0.f ? AttackRange : 1200.f;
+
+	if (TowerMesh)
+	{
+		const FVector Extent = TowerMesh->Bounds.BoxExtent;
+		Range += FMath::Max(Extent.X, Extent.Y);
+	}
+
+	return Range + 150.f;
+}
+
+AEnemyBase* ACentralTowerBase::FindNearestEnemy() const
 {
 	TArray<AActor*> FoundEnemies;
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), FoundEnemies);
 
-	AActor* Nearest = nullptr;
-	float NearestDistSq = FMath::Square(AttackRange);
+	AEnemyBase* Nearest = nullptr;
+	float NearestDistSq = FMath::Square(GetEffectiveAttackRange());
+	const FVector TowerLoc = GetActorLocation();
 
 	for (AActor* Actor : FoundEnemies)
 	{
@@ -96,7 +107,7 @@ AActor* ACentralTowerBase::FindNearestEnemy() const
 			continue;
 		}
 
-		const float DistSq = FVector::DistSquared(GetActorLocation(), Enemy->GetActorLocation());
+		const float DistSq = FVector::DistSquared2D(TowerLoc, Enemy->GetActorLocation());
 		if (DistSq <= NearestDistSq)
 		{
 			NearestDistSq = DistSq;
