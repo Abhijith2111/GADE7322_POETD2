@@ -4,6 +4,7 @@
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "EnemyBase.h"
+#include "HealthBarWidget.h"
 
 ADefenderBase::ADefenderBase()
 {
@@ -27,6 +28,14 @@ ADefenderBase::ADefenderBase()
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 150.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidget->SetDrawSize(FVector2D(120.f, 15.f));
+
+	TSubclassOf<UUserWidget> HealthBarClass = UHealthBarWidget::StaticClass();
+	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
+	if (HealthBarBP.Succeeded())
+	{
+		HealthBarClass = HealthBarBP.Class;
+	}
+	HealthBarWidget->SetWidgetClass(HealthBarClass);
 }
 
 void ADefenderBase::BeginPlay()
@@ -36,6 +45,7 @@ void ADefenderBase::BeginPlay()
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
 
 	const float InitialDelay = FMath::FRandRange(0.f, AttackInterval);
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ADefenderBase::ScanAndAttack, AttackInterval, true, InitialDelay);
@@ -129,4 +139,14 @@ bool ADefenderBase::IsDestroyed() const
 float ADefenderBase::GetHealthPercent() const
 {
 	return MaxHealth > 0.f ? (CurrentHealth / MaxHealth) : 0.f;
+}
+
+float ADefenderBase::GetDisplayHealthPercent_Implementation() const
+{
+	return GetHealthPercent();
+}
+
+bool ADefenderBase::IsUnitDestroyed_Implementation() const
+{
+	return bIsDestroyed;
 }

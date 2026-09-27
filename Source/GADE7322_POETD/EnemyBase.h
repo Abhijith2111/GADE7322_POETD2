@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
 #include "Components/WidgetComponent.h"
+#include "HealthDisplayInterface.h"
 #include "EnemyBase.generated.h"
 
 class ADefenderBase;
@@ -12,12 +13,15 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEnemyHealthChanged, float, NewHe
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemyDestroyed, int32, RewardAmount);
 
 UCLASS()
-class GADE7322_POETD_API AEnemyBase : public ACharacter
+class GADE7322_POETD_API AEnemyBase : public ACharacter, public IHealthDisplayInterface
 {
 	GENERATED_BODY()
 
 public:
 	AEnemyBase();
+
+	virtual float GetDisplayHealthPercent_Implementation() const override;
+	virtual bool IsUnitDestroyed_Implementation() const override;
 
 protected:
 	virtual void BeginPlay() override;

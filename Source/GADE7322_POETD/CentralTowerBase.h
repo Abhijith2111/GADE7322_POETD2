@@ -3,18 +3,22 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/WidgetComponent.h"
+#include "HealthDisplayInterface.h"
 #include "CentralTowerBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCentralTowerHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCentralTowerDestroyed);
 
 UCLASS()
-class GADE7322_POETD_API ACentralTowerBase : public AActor
+class GADE7322_POETD_API ACentralTowerBase : public AActor, public IHealthDisplayInterface
 {
 	GENERATED_BODY()
 
 public:
 	ACentralTowerBase();
+
+	virtual float GetDisplayHealthPercent_Implementation() const override;
+	virtual bool IsUnitDestroyed_Implementation() const override;
 
 protected:
 	virtual void BeginPlay() override;

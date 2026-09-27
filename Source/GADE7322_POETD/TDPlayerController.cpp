@@ -1,6 +1,24 @@
 #include "TDPlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Engine/EngineTypes.h"
+#include "TDGameMode.h"
+#include "GameOverWidget.h"
+#include "TDHUDWidget.h"
+#include "PauseMenuWidget.h"
+#include "UObject/ConstructorHelpers.h"
+
+ATDPlayerController::ATDPlayerController()
+{
+	HUDClass = UTDHUDWidget::StaticClass();
+	PauseMenuClass = UPauseMenuWidget::StaticClass();
+	GameOverClass = UGameOverWidget::StaticClass();
+
+	static ConstructorHelpers::FClassFinder<ADefenderBase> DefenderBP(TEXT("/Game/Gameplay/LevelObjects/BP_DefenderBase"));
+	if (DefenderBP.Succeeded())
+	{
+		DefenderClass = DefenderBP.Class;
+	}
+}
 
 void ATDPlayerController::BeginPlay()
 {
@@ -12,6 +30,19 @@ void ATDPlayerController::BeginPlay()
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
+	if (!HUDClass)
+	{
+		HUDClass = UTDHUDWidget::StaticClass();
+	}
+	if (!PauseMenuClass)
+	{
+		PauseMenuClass = UPauseMenuWidget::StaticClass();
+	}
+	if (!GameOverClass)
+	{
+		GameOverClass = UGameOverWidget::StaticClass();
+	}
+
 	if (HUDClass)
 	{
 		HUDInstance = CreateWidget<UUserWidget>(this, HUDClass);
@@ -19,6 +50,12 @@ void ATDPlayerController::BeginPlay()
 		{
 			HUDInstance->AddToViewport(0);
 		}
+	}
+
+	if (ATDGameMode* GM = Cast<ATDGameMode>(UGameplayStatics::GetGameMode(this)))
+	{
+		GM->OnLoss.AddDynamic(this, &ATDPlayerController::HandleGameLoss);
+		GM->OnVictory.AddDynamic(this, &ATDPlayerController::HandleGameVictory);
 	}
 }
 
@@ -36,6 +73,11 @@ void ATDPlayerController::SetupInputComponent()
 
 void ATDPlayerController::TogglePause()
 {
+	if (GameOverInstance && GameOverInstance->IsInViewport())
+	{
+		return;
+	}
+
 	bIsPaused = !bIsPaused;
 
 	SetPause(bIsPaused);
@@ -91,6 +133,50 @@ void ATDPlayerController::SetPendingDefender(TSubclassOf<ADefenderBase> InDefend
 void ATDPlayerController::TogglePauseMenu()
 {
 	TogglePause();
+}
+
+void ATDPlayerController::HandleGameLoss()
+{
+	ShowGameOver(false);
+}
+
+void ATDPlayerController::HandleGameVictory()
+{
+	ShowGameOver(true);
+}
+
+void ATDPlayerController::ShowGameOver(bool bVictory)
+{
+	SetPause(true);
+	bIsPaused = true;
+
+	if (!GameOverClass)
+	{
+		GameOverClass = UGameOverWidget::StaticClass();
+	}
+
+	if (!GameOverInstance && GameOverClass)
+	{
+		GameOverInstance = CreateWidget<UUserWidget>(this, GameOverClass);
+	}
+
+	if (UGameOverWidget* GO = Cast<UGameOverWidget>(GameOverInstance))
+	{
+		GO->ShowResult(bVictory);
+	}
+
+	if (GameOverInstance)
+	{
+		GameOverInstance->AddToViewport(20);
+	}
+
+	FInputModeUIOnly InputMode;
+	if (GameOverInstance)
+	{
+		InputMode.SetWidgetToFocus(GameOverInstance->TakeWidget());
+	}
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
 }
 
 ATDGameState* ATDPlayerController::GetGameState() const

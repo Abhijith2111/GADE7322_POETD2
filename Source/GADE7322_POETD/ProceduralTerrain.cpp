@@ -1,5 +1,6 @@
 #include "ProceduralTerrain.h"
 #include "DrawDebugHelpers.h"
+#include "TDGameState.h"
 
 AProceduralTerrain::AProceduralTerrain()
 {
@@ -60,6 +61,14 @@ void AProceduralTerrain::BeginPlay()
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnedCentralTower = GetWorld()->SpawnActor<ACentralTowerBase>(
 			CentralTowerClass, CentralTowerLocation, FRotator::ZeroRotator, SpawnParams);
+
+		if (SpawnedCentralTower)
+		{
+			if (ATDGameState* GS = GetWorld()->GetGameState<ATDGameState>())
+			{
+				GS->RegisterCentralTower(SpawnedCentralTower);
+			}
+		}
 	}
 }
 

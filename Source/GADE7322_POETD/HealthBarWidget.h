@@ -2,8 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
+#include "Widgets/SWidget.h"
 #include "HealthDisplayInterface.h"
 #include "HealthBarWidget.generated.h"
+
+class UWidgetComponent;
 
 UCLASS()
 class GADE7322_POETD_API UHealthBarWidget : public UUserWidget
@@ -14,18 +17,36 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void InitializeWithOwner(AActor* InOwner);
 
-	UPROPERTY(meta = (BindWidget))
+	UFUNCTION(BlueprintCallable, Category = "Health")
+	static void BindToWidgetComponent(UWidgetComponent* Comp, AActor* Owner);
+
+	/** Prefers Content/UI/WBP_HealthBar; falls back to this C++ class. */
+	static TSubclassOf<UUserWidget> GetPreferredWidgetClass();
+
+	UPROPERTY(meta = (BindWidgetOptional))
 	class UProgressBar* HealthProgressBar;
 
 protected:
+	virtual TSharedRef<SWidget> RebuildWidget() override;
+	virtual void NativeOnInitialized() override;
+	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
-	UFUNCTION(BlueprintImplementableEvent, Category = "Health")
+	UFUNCTION(BlueprintNativeEvent, Category = "Health")
 	void PlayDamageFlash();
+	virtual void PlayDamageFlash_Implementation();
+
+	void EnsureDefaultLayout();
+	void TryAutoBindOwner();
+	void UpdateDamageFlash(float InDeltaTime);
 
 	UPROPERTY()
 	TWeakObjectPtr<AActor> OwningActor;
 
 	float LastKnownPercent = 1.f;
 	float PollTimer = 0.f;
+	float DamageFlashRemaining = 0.f;
+
+	FLinearColor HealthyFillColor = FLinearColor(0.15f, 0.82f, 0.22f, 1.f);
+	FLinearColor FlashFillColor = FLinearColor(1.f, 0.95f, 0.95f, 1.f);
 };

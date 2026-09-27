@@ -3,16 +3,16 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Widgets/SWidget.h"
-#include "PauseMenuWidget.generated.h"
+#include "GameOverWidget.generated.h"
 
 UCLASS()
-class GADE7322_POETD_API UPauseMenuWidget : public UUserWidget
+class GADE7322_POETD_API UGameOverWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
 public:
 	UPROPERTY(meta = (BindWidgetOptional))
-	class UButton* ResumeButton;
+	class UTextBlock* ResultText;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	class UButton* RestartButton;
@@ -23,19 +23,19 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Levels")
 	TSoftObjectPtr<UWorld> MainMenuLevel;
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ShowResult(bool bVictory);
+
 protected:
 	virtual TSharedRef<SWidget> RebuildWidget() override;
 	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 
 	UFUNCTION()
-	void OnResumeClicked();
-
-	UFUNCTION()
 	void OnRestartClicked();
 
 	UFUNCTION()
-	void OnQuitToMenuClicked();
+	void OnQuitClicked();
 
 	void EnsureDefaultLayout();
 };

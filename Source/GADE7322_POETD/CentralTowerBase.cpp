@@ -4,6 +4,8 @@
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "EnemyBase.h"
+#include "HealthBarWidget.h"
+#include "TDGameState.h"
 
 ACentralTowerBase::ACentralTowerBase()
 {
@@ -26,7 +28,15 @@ ACentralTowerBase::ACentralTowerBase()
 	HealthBarWidget->SetupAttachment(RootComponent);
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 500.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	HealthBarWidget->SetDrawSize(FVector2D(200.f, 25.f));
+	HealthBarWidget->SetDrawSize(FVector2D(220.f, 28.f));
+
+	TSubclassOf<UUserWidget> HealthBarClass = UHealthBarWidget::StaticClass();
+	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
+	if (HealthBarBP.Succeeded())
+	{
+		HealthBarClass = HealthBarBP.Class;
+	}
+	HealthBarWidget->SetWidgetClass(HealthBarClass);
 }
 
 void ACentralTowerBase::BeginPlay()
@@ -36,6 +46,12 @@ void ACentralTowerBase::BeginPlay()
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+
+	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
+	{
+		GS->RegisterCentralTower(this);
+	}
 
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, AttackInterval, true, 0.5f);
 }
@@ -128,4 +144,14 @@ bool ACentralTowerBase::IsDestroyed() const
 float ACentralTowerBase::GetHealthPercent() const
 {
 	return MaxHealth > 0.f ? (CurrentHealth / MaxHealth) : 0.f;
+}
+
+float ACentralTowerBase::GetDisplayHealthPercent_Implementation() const
+{
+	return GetHealthPercent();
+}
+
+bool ACentralTowerBase::IsUnitDestroyed_Implementation() const
+{
+	return bIsDestroyed;
 }

@@ -17,6 +17,9 @@ class GADE7322_POETD_API ATDPlayerController : public APlayerController
 {
 	GENERATED_BODY()
 
+public:
+	ATDPlayerController();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void SetupInputComponent() override;
@@ -51,6 +54,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TSubclassOf<UUserWidget> HUDClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> GameOverClass;
 
 	UPROPERTY(BlueprintAssignable, Category = "Placement")
 	FOnDefenderPlacementSucceeded OnDefenderPlacementSucceeded;
@@ -89,7 +95,18 @@ private:
 	UPROPERTY()
 	UUserWidget* HUDInstance;
 
+	UPROPERTY()
+	UUserWidget* GameOverInstance;
+
 	bool bIsPaused = false;
+
+	UFUNCTION()
+	void HandleGameLoss();
+
+	UFUNCTION()
+	void HandleGameVictory();
+
+	void ShowGameOver(bool bVictory);
 
 	TSet<int32> OccupiedGridIndices;
 	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;

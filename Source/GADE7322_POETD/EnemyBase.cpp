@@ -6,6 +6,8 @@
 #include "DefenderBase.h"
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
+#include "HealthBarWidget.h"
+#include "UObject/ConstructorHelpers.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -32,6 +34,14 @@ AEnemyBase::AEnemyBase()
 	HealthBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
 	HealthBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	HealthBarWidget->SetDrawSize(FVector2D(100.f, 12.f));
+
+	TSubclassOf<UUserWidget> HealthBarClass = UHealthBarWidget::StaticClass();
+	static ConstructorHelpers::FClassFinder<UUserWidget> HealthBarBP(TEXT("/Game/UI/WBP_HealthBar"));
+	if (HealthBarBP.Succeeded())
+	{
+		HealthBarClass = HealthBarBP.Class;
+	}
+	HealthBarWidget->SetWidgetClass(HealthBarClass);
 }
 
 void AEnemyBase::BeginPlay()
@@ -47,6 +57,7 @@ void AEnemyBase::BeginPlay()
 	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
 }
 
 void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -252,6 +263,16 @@ void AEnemyBase::HandleDeath()
 }
 
 bool AEnemyBase::IsDefeated() const
+{
+	return bIsDefeated;
+}
+
+float AEnemyBase::GetDisplayHealthPercent_Implementation() const
+{
+	return MaxHealth > 0.f ? CurrentHealth / MaxHealth : 0.f;
+}
+
+bool AEnemyBase::IsUnitDestroyed_Implementation() const
 {
 	return bIsDefeated;
 }

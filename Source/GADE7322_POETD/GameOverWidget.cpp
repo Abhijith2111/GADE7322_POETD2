@@ -1,4 +1,4 @@
-#include "PauseMenuWidget.h"
+#include "GameOverWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
 #include "Components/Overlay.h"
@@ -9,45 +9,40 @@
 #include "Components/SizeBox.h"
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
-#include "TDPlayerController.h"
 #include "UILayoutHelpers.h"
 
-TSharedRef<SWidget> UPauseMenuWidget::RebuildWidget()
+TSharedRef<SWidget> UGameOverWidget::RebuildWidget()
 {
 	EnsureDefaultLayout();
 	return Super::RebuildWidget();
 }
 
-void UPauseMenuWidget::NativeOnInitialized()
+void UGameOverWidget::NativeOnInitialized()
 {
 	Super::NativeOnInitialized();
 	EnsureDefaultLayout();
 }
 
-void UPauseMenuWidget::NativeConstruct()
+void UGameOverWidget::NativeConstruct()
 {
 	EnsureDefaultLayout();
 	Super::NativeConstruct();
 
 	SetIsFocusable(true);
 
-	if (ResumeButton)
-	{
-		ResumeButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnResumeClicked);
-	}
 	if (RestartButton)
 	{
-		RestartButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnRestartClicked);
+		RestartButton->OnClicked.AddDynamic(this, &UGameOverWidget::OnRestartClicked);
 	}
 	if (QuitToMenuButton)
 	{
-		QuitToMenuButton->OnClicked.AddDynamic(this, &UPauseMenuWidget::OnQuitToMenuClicked);
+		QuitToMenuButton->OnClicked.AddDynamic(this, &UGameOverWidget::OnQuitClicked);
 	}
 }
 
-void UPauseMenuWidget::EnsureDefaultLayout()
+void UGameOverWidget::EnsureDefaultLayout()
 {
-	if (ResumeButton || !WidgetTree)
+	if (ResultText || !WidgetTree)
 	{
 		return;
 	}
@@ -56,7 +51,7 @@ void UPauseMenuWidget::EnsureDefaultLayout()
 	WidgetTree->RootWidget = Overlay;
 
 	UBorder* Dim = WidgetTree->ConstructWidget<UBorder>(UBorder::StaticClass(), TEXT("DimBorder"));
-	Dim->SetBrushColor(FLinearColor(0.f, 0.f, 0.f, 0.55f));
+	Dim->SetBrushColor(FLinearColor(0.12f, 0.f, 0.f, 0.7f));
 	if (UOverlaySlot* DimSlot = Overlay->AddChildToOverlay(Dim))
 	{
 		DimSlot->SetHorizontalAlignment(HAlign_Fill);
@@ -64,9 +59,10 @@ void UPauseMenuWidget::EnsureDefaultLayout()
 	}
 
 	UVerticalBox* Menu = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("MenuBox"));
-	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("PausedTitle"));
-	TDUIStyleText(Title, NSLOCTEXT("UI", "Paused", "PAUSED"), 42, FLinearColor::White, true);
-	Menu->AddChildToVerticalBox(Title);
+
+	ResultText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ResultText"));
+	TDUIStyleText(ResultText, NSLOCTEXT("UI", "Defeat", "GAME OVER"), 52, FLinearColor(1.f, 0.2f, 0.15f), true);
+	Menu->AddChildToVerticalBox(ResultText);
 
 	auto AddMenuButton = [&](UButton*& OutButton, const FName ButtonName, const FName LabelName, const FText& Label)
 	{
@@ -77,12 +73,11 @@ void UPauseMenuWidget::EnsureDefaultLayout()
 		SizeBox->AddChild(OutButton);
 		if (UVerticalBoxSlot* Slot = Menu->AddChildToVerticalBox(SizeBox))
 		{
-			Slot->SetPadding(FMargin(0.f, 12.f, 0.f, 0.f));
+			Slot->SetPadding(FMargin(0.f, 14.f, 0.f, 0.f));
 			Slot->SetHorizontalAlignment(HAlign_Center);
 		}
 	};
 
-	AddMenuButton(ResumeButton, TEXT("ResumeButton"), TEXT("ResumeLabel"), NSLOCTEXT("UI", "Resume", "Resume"));
 	AddMenuButton(RestartButton, TEXT("RestartButton"), TEXT("RestartLabel"), NSLOCTEXT("UI", "Restart", "Restart"));
 	AddMenuButton(QuitToMenuButton, TEXT("QuitToMenuButton"), TEXT("QuitLabel"), NSLOCTEXT("UI", "Quit", "Quit"));
 
@@ -93,28 +88,33 @@ void UPauseMenuWidget::EnsureDefaultLayout()
 	}
 }
 
-void UPauseMenuWidget::OnResumeClicked()
+void UGameOverWidget::ShowResult(bool bVictory)
 {
-	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
+	EnsureDefaultLayout();
+
+	if (ResultText)
 	{
-		PC->TogglePauseMenu();
+		ResultText->SetText(bVictory
+			? NSLOCTEXT("UI", "Victory", "VICTORY")
+			: NSLOCTEXT("UI", "Defeat", "GAME OVER"));
+		ResultText->SetColorAndOpacity(FSlateColor(bVictory
+			? FLinearColor(0.95f, 0.85f, 0.2f)
+			: FLinearColor(1.f, 0.2f, 0.15f)));
 	}
 }
 
-void UPauseMenuWidget::OnRestartClicked()
+void UGameOverWidget::OnRestartClicked()
 {
 	UGameplayStatics::SetGamePaused(GetWorld(), false);
-
 	if (GetWorld())
 	{
 		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld())));
 	}
 }
 
-void UPauseMenuWidget::OnQuitToMenuClicked()
+void UGameOverWidget::OnQuitClicked()
 {
 	UGameplayStatics::SetGamePaused(GetWorld(), false);
-
 	if (!MainMenuLevel.IsNull())
 	{
 		UGameplayStatics::OpenLevelBySoftObjectPtr(this, MainMenuLevel);

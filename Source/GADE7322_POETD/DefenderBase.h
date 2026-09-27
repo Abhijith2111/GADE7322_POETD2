@@ -3,18 +3,22 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/WidgetComponent.h"
+#include "HealthDisplayInterface.h"
 #include "DefenderBase.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDefenderHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnDefenderDestroyed);
 
 UCLASS()
-class GADE7322_POETD_API ADefenderBase : public AActor
+class GADE7322_POETD_API ADefenderBase : public AActor, public IHealthDisplayInterface
 {
 	GENERATED_BODY()
 
 public:
 	ADefenderBase();
+
+	virtual float GetDisplayHealthPercent_Implementation() const override;
+	virtual bool IsUnitDestroyed_Implementation() const override;
 
 protected:
 	virtual void BeginPlay() override;
