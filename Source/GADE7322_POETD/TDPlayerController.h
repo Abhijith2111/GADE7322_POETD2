@@ -22,6 +22,7 @@ public:
 
 protected:
 	virtual void BeginPlay() override;
+	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
 
 public:
@@ -88,6 +89,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void TogglePauseMenu();
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void RestartMatch();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "500.0"))
+	float OverviewCameraHeight = 3500.f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "-89.0", ClampMax = "-20.0"))
+	float OverviewCameraPitch = -80.f;
+
 private:
 	UPROPERTY()
 	AProceduralTerrain* TerrainRef;
@@ -126,4 +136,10 @@ private:
 
 	bool FindNearestBuildLocation(const FVector& ClickLocation, FVector& OutLocation, int32& OutIndex) const;
 	bool IsFarEnoughFromPathways(const FVector& Location) const;
+
+	FTimerHandle OverviewCameraHandle;
+	int32 OverviewCameraAttempts = 0;
+
+	UFUNCTION()
+	void PlaceOverviewCamera();
 };

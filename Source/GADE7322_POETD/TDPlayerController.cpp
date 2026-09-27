@@ -6,6 +6,11 @@
 #include "TDHUDWidget.h"
 #include "PauseMenuWidget.h"
 #include "UObject/ConstructorHelpers.h"
+#include "TimerManager.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
+#include "Camera/PlayerCameraManager.h"
+#include "CentralTowerBase.h"
 
 ATDPlayerController::ATDPlayerController()
 {
@@ -57,6 +62,101 @@ void ATDPlayerController::BeginPlay()
 		GM->OnLoss.AddDynamic(this, &ATDPlayerController::HandleGameLoss);
 		GM->OnVictory.AddDynamic(this, &ATDPlayerController::HandleGameVictory);
 	}
+
+	OverviewCameraAttempts = 0;
+	GetWorldTimerManager().SetTimer(OverviewCameraHandle, this, &ATDPlayerController::PlaceOverviewCamera, 0.1f, false);
+}
+
+void ATDPlayerController::OnPossess(APawn* InPawn)
+{
+	Super::OnPossess(InPawn);
+
+	if (InPawn)
+	{
+		InPawn->SetActorEnableCollision(false);
+		if (UPawnMovementComponent* Movement = InPawn->GetMovementComponent())
+		{
+			Movement->StopMovementImmediately();
+		}
+	}
+
+	OverviewCameraAttempts = 0;
+	GetWorldTimerManager().SetTimer(OverviewCameraHandle, this, &ATDPlayerController::PlaceOverviewCamera, 0.1f, false);
+}
+
+void ATDPlayerController::PlaceOverviewCamera()
+{
+	if (!TerrainRef)
+	{
+		TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
+	}
+
+	FVector FocusPoint = FVector::ZeroVector;
+	float BoardSize = 4000.f;
+	bool bHaveFocus = false;
+
+	if (TerrainRef)
+	{
+		FocusPoint = TerrainRef->CentralTowerLocation;
+		const float StepX = TerrainRef->TileDimensions.X + TerrainRef->TileSpacing;
+		const float StepY = TerrainRef->TileDimensions.Y + TerrainRef->TileSpacing;
+		BoardSize = FMath::Max(TerrainRef->GridWidth * StepX, TerrainRef->GridHeight * StepY);
+		bHaveFocus = true;
+	}
+	else if (ACentralTowerBase* Tower = Cast<ACentralTowerBase>(
+		UGameplayStatics::GetActorOfClass(GetWorld(), ACentralTowerBase::StaticClass())))
+	{
+		FocusPoint = Tower->GetActorLocation();
+		bHaveFocus = true;
+	}
+
+	if (!bHaveFocus || !GetPawn())
+	{
+		if (OverviewCameraAttempts < 10)
+		{
+			++OverviewCameraAttempts;
+			GetWorldTimerManager().SetTimer(OverviewCameraHandle, this, &ATDPlayerController::PlaceOverviewCamera, 0.2f, false);
+		}
+		return;
+	}
+
+	const float Height = FMath::Max(OverviewCameraHeight, BoardSize * 0.75f);
+	const FVector CameraLocation = FocusPoint + FVector(0.f, 0.f, Height);
+	const FRotator CameraRotation(OverviewCameraPitch, -90.f, 0.f);
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->SetActorEnableCollision(false);
+		ControlledPawn->SetActorLocationAndRotation(CameraLocation, CameraRotation, false, nullptr, ETeleportType::TeleportPhysics);
+		if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent())
+		{
+			Movement->StopMovementImmediately();
+			Movement->Velocity = FVector::ZeroVector;
+		}
+	}
+
+	SetControlRotation(CameraRotation);
+	if (PlayerCameraManager)
+	{
+		PlayerCameraManager->ViewPitchMin = -89.f;
+		PlayerCameraManager->ViewPitchMax = -20.f;
+		PlayerCameraManager->SetGameCameraCutThisFrame();
+	}
+}
+
+void ATDPlayerController::RestartMatch()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	SetPause(false);
+	bIsPaused = false;
+
+	const FString LevelName = UGameplayStatics::GetCurrentLevelName(World, true);
+	UGameplayStatics::OpenLevel(this, FName(*LevelName));
 }
 
 void ATDPlayerController::SetupInputComponent()

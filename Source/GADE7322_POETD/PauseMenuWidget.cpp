@@ -105,11 +105,16 @@ void UPauseMenuWidget::OnResumeClicked()
 
 void UPauseMenuWidget::OnRestartClicked()
 {
-	UGameplayStatics::SetGamePaused(GetWorld(), false);
+	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
+	{
+		PC->RestartMatch();
+		return;
+	}
 
+	UGameplayStatics::SetGamePaused(GetWorld(), false);
 	if (GetWorld())
 	{
-		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld())));
+		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true)));
 	}
 }
 

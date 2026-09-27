@@ -86,7 +86,11 @@ private:
 
 	ADefenderBase* FindNearestDefender(float Range) const;
 	ACentralTowerBase* FindCentralTower() const;
+	bool IsTowerInAttackRange(const ACentralTowerBase* Tower) const;
 	void UpdateCombatState(ADefenderBase* AttackTarget, bool bCanAttackTower);
+
+	UFUNCTION()
 	void ExecuteAttack();
+
 	void HandleDeath();
 };

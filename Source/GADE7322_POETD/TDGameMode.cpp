@@ -2,10 +2,26 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "TDGameState.h"
+#include "TDPlayerController.h"
+#include "GameFramework/SpectatorPawn.h"
 
 ATDGameMode::ATDGameMode()
 {
 	GameStateClass = ATDGameState::StaticClass();
+	PlayerControllerClass = ATDPlayerController::StaticClass();
+	DefaultPawnClass = ASpectatorPawn::StaticClass();
+}
+
+void ATDGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+
+	if (!PlayerControllerClass || !PlayerControllerClass->IsChildOf(ATDPlayerController::StaticClass()))
+	{
+		PlayerControllerClass = ATDPlayerController::StaticClass();
+	}
+
+	DefaultPawnClass = ASpectatorPawn::StaticClass();
 }
 
 void ATDGameMode::BeginPlay()

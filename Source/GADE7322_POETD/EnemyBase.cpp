@@ -75,11 +75,8 @@ void AEnemyBase::Tick(float DeltaTime)
 
 	ADefenderBase* AggroDefender = FindNearestDefender(AggroRange);
 	ADefenderBase* AttackDefender = FindNearestDefender(AttackRange);
-
 	ACentralTowerBase* Tower = FindCentralTower();
-	const bool bAtFinalWaypoint = CurrentWaypointIndex >= Waypoints.Num();
-	const bool bTowerInRange = Tower && bAtFinalWaypoint &&
-		FVector::Dist(GetActorLocation(), Tower->GetActorLocation()) <= AttackRange;
+	const bool bTowerInRange = IsTowerInAttackRange(Tower);
 
 	if (AggroDefender)
 	{
@@ -94,10 +91,20 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
-	UpdateCombatState(nullptr, bTowerInRange);
-
-	if (bAtFinalWaypoint)
+	if (bTowerInRange)
 	{
+		UpdateCombatState(nullptr, true);
+		return;
+	}
+
+	UpdateCombatState(nullptr, false);
+
+	if (CurrentWaypointIndex >= Waypoints.Num())
+	{
+		if (Tower)
+		{
+			AddMovementInput((Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+		}
 		return;
 	}
 
@@ -185,6 +192,23 @@ ACentralTowerBase* AEnemyBase::FindCentralTower() const
 	return nullptr;
 }
 
+bool AEnemyBase::IsTowerInAttackRange(const ACentralTowerBase* Tower) const
+{
+	if (!Tower || Tower->IsDestroyed())
+	{
+		return false;
+	}
+
+	float Range = FMath::Max(AttackRange, 0.f);
+	if (Tower->TowerMesh)
+	{
+		const FVector Extent = Tower->TowerMesh->Bounds.BoxExtent;
+		Range += FMath::Max(Extent.X, Extent.Y);
+	}
+
+	return FVector::DistSquared2D(GetActorLocation(), Tower->GetActorLocation()) <= FMath::Square(Range);
+}
+
 void AEnemyBase::ExecuteAttack()
 {
 	if (bIsDefeated)
@@ -202,16 +226,12 @@ void AEnemyBase::ExecuteAttack()
 	}
 
 	ACentralTowerBase* Tower = FindCentralTower();
-	if (Tower && CurrentWaypointIndex >= Waypoints.Num())
+	if (IsTowerInAttackRange(Tower))
 	{
-		const float DistToTower = FVector::Dist(GetActorLocation(), Tower->GetActorLocation());
-		if (DistToTower <= AttackRange)
-		{
-			Tower->ApplyDamage(AttackDamage);
-			UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked CentralTower for %.1f damage"),
-				*GetName(), AttackDamage);
-			return;
-		}
+		Tower->ApplyDamage(AttackDamage);
+		UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked CentralTower for %.1f damage"),
+			*GetName(), AttackDamage);
+		return;
 	}
 
 	bIsAttacking = false;

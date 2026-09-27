@@ -10,6 +10,7 @@
 #include "Blueprint/WidgetTree.h"
 #include "Kismet/GameplayStatics.h"
 #include "UILayoutHelpers.h"
+#include "TDPlayerController.h"
 
 TSharedRef<SWidget> UGameOverWidget::RebuildWidget()
 {
@@ -105,10 +106,16 @@ void UGameOverWidget::ShowResult(bool bVictory)
 
 void UGameOverWidget::OnRestartClicked()
 {
+	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
+	{
+		PC->RestartMatch();
+		return;
+	}
+
 	UGameplayStatics::SetGamePaused(GetWorld(), false);
 	if (GetWorld())
 	{
-		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld())));
+		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true)));
 	}
 }
 
