@@ -92,11 +92,11 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void RestartMatch();
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "500.0"))
-	float OverviewCameraHeight = 3500.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "400.0"))
+	float OverviewCameraHeight = 1400.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "-89.0", ClampMax = "-20.0"))
-	float OverviewCameraPitch = -80.f;
+	float OverviewCameraPitch = -55.f;
 
 private:
 	UPROPERTY()

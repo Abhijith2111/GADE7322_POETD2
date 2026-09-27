@@ -243,7 +243,6 @@ FIntPoint AProceduralTerrain::GetRandomEdgeCell(int32 EdgeIndex) const
 void AProceduralTerrain::GeneratePathways()
 {
 	const FIntPoint CenterCell(GridWidth / 2, GridHeight / 2);
-	const int32 MaxSteps = (GridWidth + GridHeight) * 3;
 
 	TArray<int32> EdgeOrder = { 0, 1, 2, 3 };
 	for (int32 i = EdgeOrder.Num() - 1; i > 0; --i)
@@ -260,56 +259,44 @@ void AProceduralTerrain::GeneratePathways()
 		NewPath.DebugColor = PathColors[PathIndex % UE_ARRAY_COUNT(PathColors)];
 
 		FIntPoint Current = GetRandomEdgeCell(EdgeOrder[PathIndex % EdgeOrder.Num()]);
-		FVector CurrentWorldLocation = GridToWorldLocation(Current.X, Current.Y);
-
-		int32 Steps = 0;
-		while (Current != CenterCell && Steps < MaxSteps)
+		if (Current == CenterCell)
 		{
-			PathCellSet.Add(Current);
-			NewPath.Nodes.Add(CurrentWorldLocation);
-			NewPath.Cells.Add(Current);
-
-			const int32 DeltaX = CenterCell.X - Current.X;
-			const int32 DeltaY = CenterCell.Y - Current.Y;
-
-			bool bMoveX;
-			if (RandomStream.FRand() < 0.75f)
-			{
-				bMoveX = FMath::Abs(DeltaX) >= FMath::Abs(DeltaY);
-			}
-			else
-			{
-				bMoveX = RandomStream.FRand() < 0.5f;
-			}
-
-			FIntPoint Direction(0, 0);
-			if (bMoveX && DeltaX != 0)
-			{
-				Direction.X = FMath::Sign(DeltaX);
-			}
-			else if (DeltaY != 0)
-			{
-				Direction.Y = FMath::Sign(DeltaY);
-			}
-			else if (DeltaX != 0)
-			{
-				Direction.X = FMath::Sign(DeltaX);
-			}
-
-			const FIntPoint NextCell(
-				FMath::Clamp(Current.X + Direction.X, 0, GridWidth - 1),
-				FMath::Clamp(Current.Y + Direction.Y, 0, GridHeight - 1));
-
-			const FIntPoint ActualDirection = NextCell - Current;
-			CurrentWorldLocation += GetStepVector(ActualDirection);
-			Current = NextCell;
-
-			++Steps;
+			Current = GetRandomEdgeCell((EdgeOrder[PathIndex % EdgeOrder.Num()] + 1) % 4);
 		}
 
-		PathCellSet.Add(CenterCell);
-		NewPath.Nodes.Add(GridToWorldLocation(CenterCell.X, CenterCell.Y));
-		NewPath.Cells.Add(CenterCell);
+		TArray<FIntPoint> Cells;
+		Cells.Add(Current);
+
+		const bool bTravelXFirst = RandomStream.FRand() < 0.5f;
+		const int32 Axes[2] = { bTravelXFirst ? 0 : 1, bTravelXFirst ? 1 : 0 };
+
+		for (int32 Axis : Axes)
+		{
+			while ((Axis == 0 && Current.X != CenterCell.X) || (Axis == 1 && Current.Y != CenterCell.Y))
+			{
+				if (Axis == 0)
+				{
+					Current.X += FMath::Sign(CenterCell.X - Current.X);
+				}
+				else
+				{
+					Current.Y += FMath::Sign(CenterCell.Y - Current.Y);
+				}
+				Cells.Add(Current);
+			}
+		}
+
+		if (Cells.Last() != CenterCell)
+		{
+			Cells.Add(CenterCell);
+		}
+
+		for (const FIntPoint& Cell : Cells)
+		{
+			PathCellSet.Add(Cell);
+			NewPath.Cells.Add(Cell);
+			NewPath.Nodes.Add(GridToWorldLocation(Cell.X, Cell.Y));
+		}
 
 		Pathways.Add(NewPath);
 		PathwayNodes.Append(NewPath.Nodes);
@@ -434,43 +421,27 @@ void AProceduralTerrain::SpawnPathTiles()
 
 	PlacedTileCells.Empty();
 
-	const FIntPoint CenterCell(GridWidth / 2, GridHeight / 2);
-
-	for (const FProceduralPathway& Path : Pathways)
+	for (const FIntPoint& Cell : PathCellSet)
 	{
-		for (int32 i = 0; i < Path.Cells.Num() - 1; ++i)
+		const bool bHasX = PathCellSet.Contains(Cell + FIntPoint(1, 0)) || PathCellSet.Contains(Cell + FIntPoint(-1, 0));
+		const bool bHasY = PathCellSet.Contains(Cell + FIntPoint(0, 1)) || PathCellSet.Contains(Cell + FIntPoint(0, -1));
+
+		if (bHasX)
 		{
-			const FIntPoint Cell = Path.Cells[i];
-			if (Cell == CenterCell)
-			{
-				continue;
-			}
-
-			const FIntPoint OutDir = Path.Cells[i + 1] - Cell;
-			const FIntPoint InDir = (i > 0) ? (Cell - Path.Cells[i - 1]) : OutDir;
-
-			if (PlacedTileCells.Contains(Cell))
-			{
-				SpawnTileInstance(TJunctionTileISM, Cell, YawForDirection(OutDir) + PathTileYawOffset, PathTileZOffset);
-				UE_LOG(LogTemp, Warning,
-					TEXT("ProceduralTerrain: Cell (%d,%d) is shared by multiple pathways - placed a T-Junction tile. Verify orientation manually."),
-					Cell.X, Cell.Y);
-				continue;
-			}
-
-			if (InDir == OutDir)
-			{
-				SpawnTileInstance(StraightTileISM, Cell, YawForDirection(InDir) + PathTileYawOffset, PathTileZOffset);
-			}
-			else
-			{
-				const int32 CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
-				UInstancedStaticMeshComponent* TurnISM = (CrossZ > 0) ? TurnLeftTileISM : TurnRightTileISM;
-				SpawnTileInstance(TurnISM, Cell, YawForDirection(InDir) + PathTileYawOffset, PathTileZOffset);
-			}
-
-			PlacedTileCells.Add(Cell);
+			SpawnTileInstance(StraightTileISM, Cell, PathTileYawOffset, PathTileZOffset);
 		}
+
+		if (bHasY)
+		{
+			SpawnTileInstance(StraightTileISM, Cell, 90.f + PathTileYawOffset, PathTileZOffset + (bHasX ? 0.4f : 0.f));
+		}
+
+		if (!bHasX && !bHasY)
+		{
+			SpawnTileInstance(StraightTileISM, Cell, PathTileYawOffset, PathTileZOffset);
+		}
+
+		PlacedTileCells.Add(Cell);
 	}
 }
 

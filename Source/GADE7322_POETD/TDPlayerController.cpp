@@ -92,15 +92,11 @@ void ATDPlayerController::PlaceOverviewCamera()
 	}
 
 	FVector FocusPoint = FVector::ZeroVector;
-	float BoardSize = 4000.f;
 	bool bHaveFocus = false;
 
 	if (TerrainRef)
 	{
 		FocusPoint = TerrainRef->CentralTowerLocation;
-		const float StepX = TerrainRef->TileDimensions.X + TerrainRef->TileSpacing;
-		const float StepY = TerrainRef->TileDimensions.Y + TerrainRef->TileSpacing;
-		BoardSize = FMath::Max(TerrainRef->GridWidth * StepX, TerrainRef->GridHeight * StepY);
 		bHaveFocus = true;
 	}
 	else if (ACentralTowerBase* Tower = Cast<ACentralTowerBase>(
@@ -120,9 +116,11 @@ void ATDPlayerController::PlaceOverviewCamera()
 		return;
 	}
 
-	const float Height = FMath::Max(OverviewCameraHeight, BoardSize * 0.75f);
-	const FVector CameraLocation = FocusPoint + FVector(0.f, 0.f, Height);
-	const FRotator CameraRotation(OverviewCameraPitch, -90.f, 0.f);
+	const float Height = (OverviewCameraHeight > 2200.f)
+		? 1400.f
+		: FMath::Clamp(OverviewCameraHeight, 800.f, 2000.f);
+	const FVector CameraLocation = FocusPoint + FVector(-Height * 0.3f, 0.f, Height);
+	const FRotator CameraRotation(OverviewCameraPitch, 0.f, 0.f);
 
 	if (APawn* ControlledPawn = GetPawn())
 	{
