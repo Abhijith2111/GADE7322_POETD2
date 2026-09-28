@@ -388,23 +388,34 @@ float AProceduralTerrain::YawForDirection(const FIntPoint& Dir) const
 	return 0.f;
 }
 
-void AProceduralTerrain::SpawnTileInstance(UInstancedStaticMeshComponent* ISM, const FIntPoint& Cell, float Yaw, float ZOffset)
+void AProceduralTerrain::SpawnTileInstance(UInstancedStaticMeshComponent* ISM, const FIntPoint& Cell, float Yaw, float ZOffset, float XYScaleMultiplier)
 {
 	if (!ISM || !ISM->GetStaticMesh())
 	{
 		return;
 	}
 
+	UStaticMesh* Mesh = ISM->GetStaticMesh();
+	const FBoxSphereBounds Bounds = Mesh->GetBounds();
+	const FVector MeshSize = Bounds.BoxExtent * 2.f;
+	if (MeshSize.X <= KINDA_SMALL_NUMBER || MeshSize.Y <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float SafeScale = FMath::Clamp(XYScaleMultiplier, 0.5f, 1.f);
+	const FVector Scale(
+		(TileDimensions.X * SafeScale) / MeshSize.X,
+		(TileDimensions.Y * SafeScale) / MeshSize.Y,
+		1.f);
+
 	const FRotator Rotation(0.f, Yaw, 0.f);
-
-	const FBoxSphereBounds Bounds = ISM->GetStaticMesh()->GetBounds();
-	const FVector LocalCenterOffsetXY(Bounds.Origin.X, Bounds.Origin.Y, 0.f);
+	const FVector LocalCenterOffsetXY(Bounds.Origin.X * Scale.X, Bounds.Origin.Y * Scale.Y, 0.f);
 	const FVector RotatedOffset = Rotation.RotateVector(LocalCenterOffsetXY);
-
 	const FVector CellCenter = GridToWorldLocation(Cell.X, Cell.Y) + FVector(0.f, 0.f, ZOffset);
 	const FVector PivotLocation = CellCenter - RotatedOffset;
 
-	ISM->AddInstance(FTransform(Rotation, PivotLocation, FVector(1.f)));
+	ISM->AddInstance(FTransform(Rotation, PivotLocation, Scale));
 }
 
 void AProceduralTerrain::SpawnPathTiles()
@@ -421,26 +432,82 @@ void AProceduralTerrain::SpawnPathTiles()
 
 	PlacedTileCells.Empty();
 
+	static const FIntPoint Cardinals[] = { FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1) };
+	const float PathZ = FMath::Max(PathTileZOffset, GroundTileZOffset + 4.f);
+	constexpr float PathFit = 0.995f;
+
+	auto PickTurnISM = [this](int32 CrossZ) -> UInstancedStaticMeshComponent*
+	{
+		// Meshes are authored opposite to the path CrossZ sign, so swap left/right.
+		UInstancedStaticMeshComponent* Preferred = (CrossZ > 0) ? TurnRightTileISM : TurnLeftTileISM;
+		if (Preferred && Preferred->GetStaticMesh())
+		{
+			return Preferred;
+		}
+		Preferred = (CrossZ > 0) ? TurnLeftTileISM : TurnRightTileISM;
+		if (Preferred && Preferred->GetStaticMesh())
+		{
+			return Preferred;
+		}
+		return StraightTileISM;
+	};
+
 	for (const FIntPoint& Cell : PathCellSet)
 	{
-		const bool bHasX = PathCellSet.Contains(Cell + FIntPoint(1, 0)) || PathCellSet.Contains(Cell + FIntPoint(-1, 0));
-		const bool bHasY = PathCellSet.Contains(Cell + FIntPoint(0, 1)) || PathCellSet.Contains(Cell + FIntPoint(0, -1));
-
-		if (bHasX)
+		TArray<FIntPoint, TInlineAllocator<4>> NeighborDirs;
+		for (const FIntPoint& Dir : Cardinals)
 		{
-			SpawnTileInstance(StraightTileISM, Cell, PathTileYawOffset, PathTileZOffset);
+			if (PathCellSet.Contains(Cell + Dir))
+			{
+				NeighborDirs.Add(Dir);
+			}
 		}
 
-		if (bHasY)
+		UInstancedStaticMeshComponent* TileISM = StraightTileISM;
+		float Yaw = PathTileYawOffset;
+
+		if (NeighborDirs.Num() == 0)
 		{
-			SpawnTileInstance(StraightTileISM, Cell, 90.f + PathTileYawOffset, PathTileZOffset + (bHasX ? 0.4f : 0.f));
+			Yaw = PathTileYawOffset;
+			TileISM = StraightTileISM;
+		}
+		else if (NeighborDirs.Num() == 1 ||
+			(NeighborDirs.Num() == 2 && NeighborDirs[0] + NeighborDirs[1] == FIntPoint(0, 0)))
+		{
+			Yaw = YawForDirection(NeighborDirs[0]) + PathTileYawOffset;
+			TileISM = StraightTileISM;
+		}
+		else if (NeighborDirs.Num() == 2)
+		{
+			FIntPoint InDir(-NeighborDirs[0].X, -NeighborDirs[0].Y);
+			FIntPoint OutDir = NeighborDirs[1];
+			int32 CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
+			if (CrossZ == 0)
+			{
+				InDir = FIntPoint(-NeighborDirs[1].X, -NeighborDirs[1].Y);
+				OutDir = NeighborDirs[0];
+				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
+			}
+			Yaw = YawForDirection(InDir) + PathTileYawOffset;
+			TileISM = PickTurnISM(CrossZ);
+		}
+		else
+		{
+			FIntPoint Stem = NeighborDirs[0];
+			for (const FIntPoint& Dir : NeighborDirs)
+			{
+				if (!NeighborDirs.Contains(FIntPoint(-Dir.X, -Dir.Y)))
+				{
+					Stem = Dir;
+					break;
+				}
+			}
+
+			Yaw = YawForDirection(Stem) - 90.f + PathTileYawOffset;
+			TileISM = (TJunctionTileISM && TJunctionTileISM->GetStaticMesh()) ? TJunctionTileISM : StraightTileISM;
 		}
 
-		if (!bHasX && !bHasY)
-		{
-			SpawnTileInstance(StraightTileISM, Cell, PathTileYawOffset, PathTileZOffset);
-		}
-
+		SpawnTileInstance(TileISM, Cell, Yaw, PathZ, PathFit);
 		PlacedTileCells.Add(Cell);
 	}
 }
@@ -466,6 +533,7 @@ void AProceduralTerrain::SpawnGroundTiles()
 	}
 
 	const FIntPoint CenterCell(GridWidth / 2, GridHeight / 2);
+	constexpr float GroundFit = 0.99f;
 
 	for (int32 Y = 0; Y < GridHeight; ++Y)
 	{
@@ -480,7 +548,7 @@ void AProceduralTerrain::SpawnGroundTiles()
 
 			UInstancedStaticMeshComponent* ChosenISM = ValidGroundISMs[RandomStream.RandRange(0, ValidGroundISMs.Num() - 1)];
 			const float Yaw = bRandomizeGroundTileRotation ? RandomStream.RandRange(0, 3) * 90.f : 0.f;
-			SpawnTileInstance(ChosenISM, Cell, Yaw, GroundTileZOffset);
+			SpawnTileInstance(ChosenISM, Cell, Yaw, GroundTileZOffset, GroundFit);
 		}
 	}
 

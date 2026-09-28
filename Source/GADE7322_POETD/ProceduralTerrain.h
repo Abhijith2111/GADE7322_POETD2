@@ -125,7 +125,7 @@ public:
 	float PathTileYawOffset = 0.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|PathTiles")
-	float PathTileZOffset = 2.f;
+	float PathTileZOffset = 8.f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|GroundTiles")
 	bool bSpawnGroundTiles = true;
@@ -201,6 +201,6 @@ private:
 
 	void SpawnPathTiles();
 	void SpawnGroundTiles();
-	void SpawnTileInstance(UInstancedStaticMeshComponent* ISM, const FIntPoint& Cell, float Yaw, float ZOffset);
+	void SpawnTileInstance(UInstancedStaticMeshComponent* ISM, const FIntPoint& Cell, float Yaw, float ZOffset, float XYScaleMultiplier = 1.f);
 	float YawForDirection(const FIntPoint& Dir) const;
 };
