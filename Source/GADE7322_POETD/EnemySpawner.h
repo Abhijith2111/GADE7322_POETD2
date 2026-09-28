@@ -6,6 +6,9 @@
 #include "ProceduralTerrain.h"
 #include "EnemySpawner.generated.h"
 
+class AEnemyBrute;
+class AEnemyTrojanHorse;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemySpawned, AEnemyBase*, SpawnedEnemy);
 
 UCLASS()
@@ -22,6 +25,21 @@ protected:
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TSubclassOf<AEnemyBase> EnemyClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
+	TSubclassOf<AEnemyBase> BruteClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
+	TSubclassOf<AEnemyBase> TrojanClass;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))
+	int32 NormalWeight = 6;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))
+	int32 BruteWeight = 2;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))
+	int32 TrojanWeight = 1;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (ClampMin = "0.1"))
 	float SpawnInterval = 3.f;
@@ -56,6 +74,7 @@ private:
 	int32 CurrentPathIndex = 0;
 
 	void SpawnNextEnemy();
+	TSubclassOf<AEnemyBase> PickEnemyClass() const;
 	TArray<FVector> GetWaypointsForPathIndex(int32 PathIndex) const;
 	bool HasValidWaypoints() const;
 };

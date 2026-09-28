@@ -75,7 +75,7 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsDefeated() const;
 
-private:
+protected:
 	TArray<FVector> Waypoints;
 	int32 CurrentWaypointIndex = 0;
 	bool bIsDefeated = false;
@@ -84,13 +84,19 @@ private:
 
 	FTimerHandle AttackTimerHandle;
 
+	virtual bool ShouldEngageDefenders() const;
+	virtual void UpdateMovementAndCombat(float DeltaTime);
+	virtual void OnReachedTower(ACentralTowerBase* Tower);
+	virtual void FollowPath(float DeltaTime);
+	virtual void HandleDeath();
+
 	ADefenderBase* FindNearestDefender(float Range) const;
 	ACentralTowerBase* FindCentralTower() const;
 	bool IsTowerInAttackRange(const ACentralTowerBase* Tower) const;
 	void UpdateCombatState(ADefenderBase* AttackTarget, bool bCanAttackTower);
 
 	UFUNCTION()
-	void ExecuteAttack();
+	virtual void ExecuteAttack();
 
-	void HandleDeath();
+	TArray<FVector> GetRemainingWaypoints() const;
 };

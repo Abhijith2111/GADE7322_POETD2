@@ -59,7 +59,7 @@ void AEnemyBase::InitialiseWithWaypoints(const TArray<FVector>& InWaypoints)
 {
 	Waypoints = InWaypoints;
 	CurrentWaypointIndex = 0;
-	bWaypointsInitialised = Waypoints.Num() > 0;
+	bWaypointsInitialised = true;
 
 	UE_LOG(LogTemp, Log, TEXT("EnemyBase %s initialised with %d waypoints"), *GetName(), Waypoints.Num());
 }
@@ -73,31 +73,61 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
-	ADefenderBase* AggroDefender = FindNearestDefender(AggroRange);
-	ADefenderBase* AttackDefender = FindNearestDefender(AttackRange);
+	UpdateMovementAndCombat(DeltaTime);
+}
+
+bool AEnemyBase::ShouldEngageDefenders() const
+{
+	return true;
+}
+
+void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
+{
 	ACentralTowerBase* Tower = FindCentralTower();
 	const bool bTowerInRange = IsTowerInAttackRange(Tower);
 
-	if (AggroDefender)
+	if (ShouldEngageDefenders())
 	{
-		DrawDebugLine(GetWorld(), GetActorLocation(), AggroDefender->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
-		UpdateCombatState(AttackDefender, false);
+		ADefenderBase* AggroDefender = FindNearestDefender(AggroRange);
+		ADefenderBase* AttackDefender = FindNearestDefender(AttackRange);
 
-		if (!AttackDefender)
+		if (AggroDefender)
 		{
-			const FVector ToDefender = AggroDefender->GetActorLocation() - GetActorLocation();
-			AddMovementInput(ToDefender.GetSafeNormal2D());
+			DrawDebugLine(GetWorld(), GetActorLocation(), AggroDefender->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
+			UpdateCombatState(AttackDefender, false);
+
+			if (!AttackDefender)
+			{
+				const FVector ToDefender = AggroDefender->GetActorLocation() - GetActorLocation();
+				AddMovementInput(ToDefender.GetSafeNormal2D());
+			}
+			return;
 		}
-		return;
 	}
 
 	if (bTowerInRange)
 	{
-		UpdateCombatState(nullptr, true);
+		OnReachedTower(Tower);
 		return;
 	}
 
 	UpdateCombatState(nullptr, false);
+	FollowPath(DeltaTime);
+}
+
+void AEnemyBase::OnReachedTower(ACentralTowerBase* Tower)
+{
+	UpdateCombatState(nullptr, true);
+
+	if (Tower && CurrentWaypointIndex >= Waypoints.Num())
+	{
+		AddMovementInput((Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+	}
+}
+
+void AEnemyBase::FollowPath(float DeltaTime)
+{
+	ACentralTowerBase* Tower = FindCentralTower();
 
 	if (CurrentWaypointIndex >= Waypoints.Num())
 	{
@@ -119,6 +149,10 @@ void AEnemyBase::Tick(float DeltaTime)
 		if (CurrentWaypointIndex >= Waypoints.Num())
 		{
 			UE_LOG(LogTemp, Log, TEXT("EnemyBase %s reached final waypoint (central tower)."), *GetName());
+			if (Tower && IsTowerInAttackRange(Tower))
+			{
+				OnReachedTower(Tower);
+			}
 		}
 		return;
 	}
@@ -216,13 +250,16 @@ void AEnemyBase::ExecuteAttack()
 		return;
 	}
 
-	ADefenderBase* NearestDefender = FindNearestDefender(AttackRange);
-	if (NearestDefender)
+	if (ShouldEngageDefenders())
 	{
-		NearestDefender->ApplyDamage(AttackDamage);
-		UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked Defender %s for %.1f damage"),
-			*GetName(), *NearestDefender->GetName(), AttackDamage);
-		return;
+		ADefenderBase* NearestDefender = FindNearestDefender(AttackRange);
+		if (NearestDefender)
+		{
+			NearestDefender->ApplyDamage(AttackDamage);
+			UE_LOG(LogTemp, Log, TEXT("EnemyBase %s attacked Defender %s for %.1f damage"),
+				*GetName(), *NearestDefender->GetName(), AttackDamage);
+			return;
+		}
 	}
 
 	ACentralTowerBase* Tower = FindCentralTower();
@@ -276,6 +313,19 @@ void AEnemyBase::HandleDeath()
 
 	OnEnemyDestroyed.Broadcast(RewardOnDeath);
 	SetLifeSpan(0.1f);
+}
+
+TArray<FVector> AEnemyBase::GetRemainingWaypoints() const
+{
+	TArray<FVector> Remaining;
+	if (CurrentWaypointIndex < Waypoints.Num())
+	{
+		for (int32 i = CurrentWaypointIndex; i < Waypoints.Num(); ++i)
+		{
+			Remaining.Add(Waypoints[i]);
+		}
+	}
+	return Remaining;
 }
 
 bool AEnemyBase::IsDefeated() const

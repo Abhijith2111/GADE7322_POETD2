@@ -1,15 +1,44 @@
 #include "EnemySpawner.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "UObject/ConstructorHelpers.h"
+#include "EnemyBrute.h"
+#include "EnemyTrojanHorse.h"
 
 AEnemySpawner::AEnemySpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
+
+	BruteClass = AEnemyBrute::StaticClass();
+	TrojanClass = AEnemyTrojanHorse::StaticClass();
+
+	static ConstructorHelpers::FClassFinder<AEnemyBase> NormalEnemyBP(TEXT("/Game/Gameplay/Enemies/Blueprints/BP_EnemyBase"));
+	if (NormalEnemyBP.Succeeded())
+	{
+		EnemyClass = NormalEnemyBP.Class;
+	}
+	else
+	{
+		EnemyClass = AEnemyBase::StaticClass();
+	}
 }
 
 void AEnemySpawner::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (!EnemyClass)
+	{
+		EnemyClass = AEnemyBase::StaticClass();
+	}
+	if (!BruteClass)
+	{
+		BruteClass = AEnemyBrute::StaticClass();
+	}
+	if (!TrojanClass)
+	{
+		TrojanClass = AEnemyTrojanHorse::StaticClass();
+	}
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
@@ -31,9 +60,9 @@ void AEnemySpawner::BeginPlay()
 
 void AEnemySpawner::StartSpawning()
 {
-	if (!EnemyClass)
+	if (!EnemyClass && !BruteClass && !TrojanClass)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("EnemySpawner: EnemyClass is not assigned. Spawning aborted."));
+		UE_LOG(LogTemp, Warning, TEXT("EnemySpawner: No enemy classes assigned. Spawning aborted."));
 		return;
 	}
 
@@ -69,9 +98,49 @@ TArray<FVector> AEnemySpawner::GetWaypointsForPathIndex(int32 PathIndex) const
 	return ManualWaypoints;
 }
 
+TSubclassOf<AEnemyBase> AEnemySpawner::PickEnemyClass() const
+{
+	const int32 Total = FMath::Max(0, NormalWeight) + FMath::Max(0, BruteWeight) + FMath::Max(0, TrojanWeight);
+	if (Total <= 0)
+	{
+		if (EnemyClass)
+		{
+			return EnemyClass;
+		}
+		return TSubclassOf<AEnemyBase>(AEnemyBase::StaticClass());
+	}
+
+	int32 Roll = FMath::RandRange(0, Total - 1);
+	if (Roll < NormalWeight)
+	{
+		if (EnemyClass)
+		{
+			return EnemyClass;
+		}
+		return TSubclassOf<AEnemyBase>(AEnemyBase::StaticClass());
+	}
+	Roll -= NormalWeight;
+
+	if (Roll < BruteWeight)
+	{
+		if (BruteClass)
+		{
+			return BruteClass;
+		}
+		return TSubclassOf<AEnemyBase>(AEnemyBrute::StaticClass());
+	}
+
+	if (TrojanClass)
+	{
+		return TrojanClass;
+	}
+	return TSubclassOf<AEnemyBase>(AEnemyTrojanHorse::StaticClass());
+}
+
 void AEnemySpawner::SpawnNextEnemy()
 {
-	if (!EnemyClass)
+	TSubclassOf<AEnemyBase> ClassToSpawn = PickEnemyClass();
+	if (!ClassToSpawn)
 	{
 		return;
 	}
@@ -130,7 +199,7 @@ void AEnemySpawner::SpawnNextEnemy()
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
 
-	AEnemyBase* NewEnemy = GetWorld()->SpawnActor<AEnemyBase>(EnemyClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
+	AEnemyBase* NewEnemy = GetWorld()->SpawnActor<AEnemyBase>(ClassToSpawn, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
 
 	if (NewEnemy)
 	{
