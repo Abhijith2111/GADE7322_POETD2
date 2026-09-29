@@ -69,4 +69,5 @@ private:
 
 	void ScanAndAttack();
 	AActor* FindNearestTarget() const;
+	void SnapToGround();
 };

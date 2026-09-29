@@ -72,4 +72,5 @@ private:
 
 	AEnemyBase* FindNearestEnemy() const;
 	float GetEffectiveAttackRange() const;
+	void SnapToGround();
 };

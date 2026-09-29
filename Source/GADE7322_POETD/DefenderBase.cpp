@@ -3,6 +3,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
 #include "EnemyBase.h"
 #include "HealthBarWidget.h"
 
@@ -13,11 +15,20 @@ ADefenderBase::ADefenderBase()
 	DefenderMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("DefenderMesh"));
 	RootComponent = DefenderMesh;
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMeshAsset(TEXT("/Engine/BasicShapes/Cone.Cone"));
-	if (ConeMeshAsset.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> ArcherTowerAsset(TEXT("/Game/Buildings/ArcherTowerT1.ArcherTowerT1"));
+	if (ArcherTowerAsset.Succeeded())
 	{
-		DefenderMesh->SetStaticMesh(ConeMeshAsset.Object);
-		DefenderMesh->SetWorldScale3D(FVector(1.f, 1.f, 1.5f));
+		DefenderMesh->SetStaticMesh(ArcherTowerAsset.Object);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+	}
+	else
+	{
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMeshAsset(TEXT("/Engine/BasicShapes/Cone.Cone"));
+		if (ConeMeshAsset.Succeeded())
+		{
+			DefenderMesh->SetStaticMesh(ConeMeshAsset.Object);
+			DefenderMesh->SetWorldScale3D(FVector(1.f, 1.f, 1.5f));
+		}
 	}
 
 	DefenderMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -28,9 +39,57 @@ ADefenderBase::ADefenderBase()
 	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 100.f), FVector2D(56.f, 8.f));
 }
 
+void ADefenderBase::SnapToGround()
+{
+	UWorld* World = GetWorld();
+	if (!World || !DefenderMesh)
+	{
+		return;
+	}
+
+	const FVector ActorLoc = GetActorLocation();
+	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 2500.f);
+	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 5000.f);
+
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderGroundSnap), false, this);
+	Params.AddIgnoredActor(this);
+
+	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params)
+		&& !World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, Params))
+	{
+		return;
+	}
+
+	float BottomOffset = 0.f;
+	if (DefenderMesh->GetStaticMesh())
+	{
+		const FBox LocalBounds = DefenderMesh->GetStaticMesh()->GetBoundingBox();
+		const FVector Scale = DefenderMesh->GetComponentScale();
+		BottomOffset = LocalBounds.Min.Z * Scale.Z;
+	}
+
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z - BottomOffset + 2.f));
+}
+
 void ADefenderBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (UStaticMesh* ArcherMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT1.ArcherTowerT1")))
+	{
+		DefenderMesh->SetStaticMesh(ArcherMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+	}
+
+	SnapToGround();
+
+	if (DefenderMesh && DefenderMesh->GetStaticMesh())
+	{
+		const FBox LocalBounds = DefenderMesh->GetStaticMesh()->GetBoundingBox();
+		const float TopZ = LocalBounds.Max.Z * DefenderMesh->GetComponentScale().Z;
+		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 20.f), FVector2D(72.f, 10.f));
+	}
 
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;

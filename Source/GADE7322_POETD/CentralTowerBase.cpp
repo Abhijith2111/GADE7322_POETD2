@@ -3,6 +3,8 @@
 #include "Kismet/GameplayStatics.h"
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
+#include "Engine/StaticMesh.h"
+#include "Engine/World.h"
 #include "EnemyBase.h"
 #include "HealthBarWidget.h"
 #include "TDGameState.h"
@@ -14,11 +16,20 @@ ACentralTowerBase::ACentralTowerBase()
 	TowerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TowerMesh"));
 	RootComponent = TowerMesh;
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMeshAsset.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TempleMeshAsset(TEXT("/Game/Buildings/Temple.Temple"));
+	if (TempleMeshAsset.Succeeded())
 	{
-		TowerMesh->SetStaticMesh(CubeMeshAsset.Object);
-		TowerMesh->SetWorldScale3D(FVector(2.f, 2.f, 4.f));
+		TowerMesh->SetStaticMesh(TempleMeshAsset.Object);
+		TowerMesh->SetWorldScale3D(FVector(1.f));
+	}
+	else
+	{
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMeshAsset(TEXT("/Engine/BasicShapes/Cube.Cube"));
+		if (CubeMeshAsset.Succeeded())
+		{
+			TowerMesh->SetStaticMesh(CubeMeshAsset.Object);
+			TowerMesh->SetWorldScale3D(FVector(2.f, 2.f, 4.f));
+		}
 	}
 
 	TowerMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
@@ -29,9 +40,57 @@ ACentralTowerBase::ACentralTowerBase()
 	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 320.f), FVector2D(220.f, 28.f));
 }
 
+void ACentralTowerBase::SnapToGround()
+{
+	UWorld* World = GetWorld();
+	if (!World || !TowerMesh)
+	{
+		return;
+	}
+
+	const FVector ActorLoc = GetActorLocation();
+	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 2500.f);
+	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 5000.f);
+
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CentralTowerGroundSnap), false, this);
+	Params.AddIgnoredActor(this);
+
+	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params)
+		&& !World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, Params))
+	{
+		return;
+	}
+
+	float BottomOffset = 0.f;
+	if (TowerMesh->GetStaticMesh())
+	{
+		const FBox LocalBounds = TowerMesh->GetStaticMesh()->GetBoundingBox();
+		const FVector Scale = TowerMesh->GetComponentScale();
+		BottomOffset = LocalBounds.Min.Z * Scale.Z;
+	}
+
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z - BottomOffset + 2.f));
+
+	if (TowerMesh->GetStaticMesh())
+	{
+		const FBox LocalBounds = TowerMesh->GetStaticMesh()->GetBoundingBox();
+		const float TopZ = LocalBounds.Max.Z * TowerMesh->GetComponentScale().Z;
+		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 40.f), FVector2D(220.f, 28.f));
+	}
+}
+
 void ACentralTowerBase::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (UStaticMesh* TempleMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Temple.Temple")))
+	{
+		TowerMesh->SetStaticMesh(TempleMesh);
+		TowerMesh->SetWorldScale3D(FVector(1.f));
+	}
+
+	SnapToGround();
 
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;

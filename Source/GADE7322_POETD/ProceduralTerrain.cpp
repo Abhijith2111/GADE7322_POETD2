@@ -57,10 +57,21 @@ void AProceduralTerrain::BeginPlay()
 
 	if (CentralTowerClass)
 	{
+		FVector SpawnLocation = CentralTowerLocation;
+		const FVector TraceStart(CentralTowerLocation.X, CentralTowerLocation.Y, CentralTowerLocation.Z + 2500.f);
+		const FVector TraceEnd(CentralTowerLocation.X, CentralTowerLocation.Y, CentralTowerLocation.Z - 5000.f);
+
+		FHitResult SurfaceHit;
+		FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(CentralTowerSpawnSnap), false, this);
+		if (GetWorld()->LineTraceSingleByChannel(SurfaceHit, TraceStart, TraceEnd, ECC_Visibility, QueryParams))
+		{
+			SpawnLocation.Z = SurfaceHit.ImpactPoint.Z;
+		}
+
 		FActorSpawnParameters SpawnParams;
 		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 		SpawnedCentralTower = GetWorld()->SpawnActor<ACentralTowerBase>(
-			CentralTowerClass, CentralTowerLocation, FRotator::ZeroRotator, SpawnParams);
+			CentralTowerClass, SpawnLocation, FRotator::ZeroRotator, SpawnParams);
 
 		if (SpawnedCentralTower)
 		{
