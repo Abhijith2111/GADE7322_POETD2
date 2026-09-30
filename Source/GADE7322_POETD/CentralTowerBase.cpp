@@ -62,12 +62,11 @@ void ACentralTowerBase::SnapToGround()
 		return;
 	}
 
-	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z));
-	TowerMesh->UpdateBounds();
-	const FBoxSphereBounds Bounds = TowerMesh->Bounds;
-	const float CurrentBottom = Bounds.Origin.Z - Bounds.BoxExtent.Z;
-	const float DesiredBottom = Hit.ImpactPoint.Z + 4.f;
-	SetActorLocation(GetActorLocation() + FVector(0.f, 0.f, DesiredBottom - CurrentBottom));
+	const FBox LocalBox = TowerMesh->GetStaticMesh()
+		? TowerMesh->GetStaticMesh()->GetBoundingBox()
+		: FBox(FVector::ZeroVector, FVector::ZeroVector);
+	const float BottomZ = LocalBox.Min.Z * TowerMesh->GetComponentScale().Z;
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z - BottomZ + 16.f));
 
 	if (TowerMesh->GetStaticMesh())
 	{

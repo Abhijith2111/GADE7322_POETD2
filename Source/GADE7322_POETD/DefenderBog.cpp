@@ -90,10 +90,10 @@ float ADefenderBog::GetGrabRange() const
 {
 	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
 	{
-		return FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y) * 1.15f;
+		return FMath::Max(FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y) * 1.35f, 500.f);
 	}
 
-	return FMath::Max(AttackRange, 400.f);
+	return FMath::Max(AttackRange, 500.f);
 }
 
 AEnemyBase* ADefenderBog::FindEnemyToEat() const
@@ -144,10 +144,18 @@ void ADefenderBog::ScanAndAttack()
 		PulledEnemy = Enemy;
 	}
 
-	const float EatDistance = FMath::Clamp(GetGrabRange() * 0.28f, 90.f, 280.f);
-	if (FVector::DistSquared2D(GetActorLocation(), Enemy->GetActorLocation()) > FMath::Square(EatDistance))
+	const FVector BogLoc = GetActorLocation();
+	const FVector EnemyLoc = Enemy->GetActorLocation();
+	const float Dist = FVector::Dist2D(BogLoc, EnemyLoc);
+	const float EatDistance = FMath::Clamp(GetGrabRange() * 0.4f, 160.f, 420.f);
+	if (Dist > EatDistance)
 	{
-		return;
+		const FVector Step = (BogLoc - EnemyLoc).GetSafeNormal2D() * FMath::Min(Dist * 0.7f, FMath::Max(Dist - EatDistance, 80.f));
+		Enemy->SetActorLocation(FVector(EnemyLoc.X + Step.X, EnemyLoc.Y + Step.Y, EnemyLoc.Z), false);
+		if (FVector::Dist2D(BogLoc, Enemy->GetActorLocation()) > EatDistance)
+		{
+			return;
+		}
 	}
 
 	Enemy->TakeDamageFromDefender(Enemy->CurrentHealth);

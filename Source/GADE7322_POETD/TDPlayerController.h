@@ -24,6 +24,7 @@ protected:
 	virtual void BeginPlay() override;
 	virtual void OnPossess(APawn* InPawn) override;
 	virtual void SetupInputComponent() override;
+	virtual void Tick(float DeltaTime) override;
 
 public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Placement")
@@ -142,4 +143,6 @@ private:
 
 	UFUNCTION()
 	void PlaceOverviewCamera();
+
+	void ClampOverviewCamera();
 };

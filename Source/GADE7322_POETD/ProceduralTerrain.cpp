@@ -1,6 +1,10 @@
 #include "ProceduralTerrain.h"
 #include "DrawDebugHelpers.h"
 #include "TDGameState.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 AProceduralTerrain::AProceduralTerrain()
 {
@@ -12,6 +16,22 @@ AProceduralTerrain::AProceduralTerrain()
 	ProceduralMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	ProceduralMesh->SetCollisionProfileName(TEXT("BlockAll"));
 	ProceduralMesh->bUseAsyncCooking = true;
+
+	VoidPlane = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("VoidPlane"));
+	VoidPlane->SetupAttachment(RootComponent);
+	VoidPlane->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	VoidPlane->SetCastShadow(false);
+	VoidPlane->SetMobility(EComponentMobility::Movable);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> PlaneMesh(TEXT("/Engine/BasicShapes/Plane.Plane"));
+	if (PlaneMesh.Succeeded())
+	{
+		VoidPlane->SetStaticMesh(PlaneMesh.Object);
+	}
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> ShapeMat(TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (ShapeMat.Succeeded())
+	{
+		VoidPlane->SetMaterial(0, ShapeMat.Object);
+	}
 
 	auto MakeTileISM = [this](FName Name) -> UInstancedStaticMeshComponent*
 		{
@@ -132,6 +152,44 @@ void AProceduralTerrain::GenerateTerrain()
 	if (bSpawnGroundTiles)
 	{
 		SpawnGroundTiles();
+	}
+
+	UpdateVoidPlane();
+}
+
+void AProceduralTerrain::UpdateVoidPlane()
+{
+	if (!VoidPlane || !VoidPlane->GetStaticMesh())
+	{
+		return;
+	}
+
+	const float StepX = TileDimensions.X + TileSpacing;
+	const float StepY = TileDimensions.Y + TileSpacing;
+	const float BoardX = GridWidth * StepX;
+	const float BoardY = GridHeight * StepY;
+	const FBox MeshBox = VoidPlane->GetStaticMesh()->GetBoundingBox();
+	const float MeshX = FMath::Max(MeshBox.GetSize().X, 1.f);
+	const float MeshY = FMath::Max(MeshBox.GetSize().Y, 1.f);
+	constexpr float Coverage = 8.f;
+
+	VoidPlane->SetRelativeScale3D(FVector((BoardX * Coverage) / MeshX, (BoardY * Coverage) / MeshY, 1.f));
+	VoidPlane->SetRelativeLocation(FVector(BoardX * 0.5f, BoardY * 0.5f, -80.f));
+
+	UMaterialInterface* BaseMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
+	if (!BaseMat)
+	{
+		BaseMat = VoidPlane->GetMaterial(0);
+	}
+	if (BaseMat)
+	{
+		if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
+		{
+			const FLinearColor Orange(1.f, 0.42f, 0.05f);
+			DynMat->SetVectorParameterValue(TEXT("Color"), Orange);
+			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Orange);
+			VoidPlane->SetMaterial(0, DynMat);
+		}
 	}
 }
 

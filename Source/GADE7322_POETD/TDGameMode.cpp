@@ -14,12 +14,13 @@ ATDGameMode::ATDGameMode()
 
 void ATDGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
-	Super::InitGame(MapName, Options, ErrorMessage);
-
+	DefaultPawnClass = ASpectatorPawn::StaticClass();
 	if (!PlayerControllerClass || !PlayerControllerClass->IsChildOf(ATDPlayerController::StaticClass()))
 	{
 		PlayerControllerClass = ATDPlayerController::StaticClass();
 	}
+
+	Super::InitGame(MapName, Options, ErrorMessage);
 
 	DefaultPawnClass = ASpectatorPawn::StaticClass();
 }

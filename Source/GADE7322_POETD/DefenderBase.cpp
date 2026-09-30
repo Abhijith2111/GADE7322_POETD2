@@ -89,16 +89,17 @@ void ADefenderBase::SnapToGround()
 		return;
 	}
 
-	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z));
-	DefenderMesh->UpdateBounds();
-	const FBoxSphereBounds Bounds = DefenderMesh->Bounds;
-	const float CurrentBottom = Bounds.Origin.Z - Bounds.BoxExtent.Z;
-	const float DesiredBottom = Hit.ImpactPoint.Z + 4.f;
-	const FVector Correction(
-		ActorLoc.X - Bounds.Origin.X,
-		ActorLoc.Y - Bounds.Origin.Y,
-		DesiredBottom - CurrentBottom);
-	SetActorLocation(GetActorLocation() + Correction);
+	const FBox LocalBox = DefenderMesh->GetStaticMesh()
+		? DefenderMesh->GetStaticMesh()->GetBoundingBox()
+		: FBox(FVector::ZeroVector, FVector::ZeroVector);
+	const FVector Scale = DefenderMesh->GetComponentScale();
+	const float CenterX = (LocalBox.Min.X + LocalBox.Max.X) * 0.5f * Scale.X;
+	const float CenterY = (LocalBox.Min.Y + LocalBox.Max.Y) * 0.5f * Scale.Y;
+	const float BottomZ = LocalBox.Min.Z * Scale.Z;
+	SetActorLocation(FVector(
+		ActorLoc.X - CenterX,
+		ActorLoc.Y - CenterY,
+		Hit.ImpactPoint.Z - BottomZ + 16.f));
 }
 
 void ADefenderBase::ApplyDefenderMesh()

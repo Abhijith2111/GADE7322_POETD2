@@ -5,6 +5,7 @@
 #include "ProceduralMeshComponent.h"
 #include "Materials/MaterialInterface.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "CentralTowerBase.h"
 #include "ProceduralTerrain.generated.h"
 
@@ -42,6 +43,9 @@ protected:
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UProceduralMeshComponent* ProceduralMesh;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UStaticMeshComponent* VoidPlane;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Grid", meta = (ClampMin = "4"))
 	int32 GridWidth = 20;
@@ -210,6 +214,7 @@ private:
 
 	void SpawnPathTiles();
 	void SpawnGroundTiles();
+	void UpdateVoidPlane();
 	void SpawnTileInstance(UInstancedStaticMeshComponent* ISM, const FIntPoint& Cell, float Yaw, float ZOffset, float XYScaleMultiplier = 1.f);
 	float YawForDirection(const FIntPoint& Dir) const;
 };

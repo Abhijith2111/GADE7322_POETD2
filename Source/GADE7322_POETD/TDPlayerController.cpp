@@ -9,12 +9,16 @@
 #include "TimerManager.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/PawnMovementComponent.h"
+#include "GameFramework/WorldSettings.h"
 #include "Camera/PlayerCameraManager.h"
 #include "CentralTowerBase.h"
 #include "DefenderBog.h"
 
 ATDPlayerController::ATDPlayerController()
 {
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
+
 	HUDClass = UTDHUDWidget::StaticClass();
 	PauseMenuClass = UPauseMenuWidget::StaticClass();
 	GameOverClass = UGameOverWidget::StaticClass();
@@ -33,6 +37,25 @@ void ATDPlayerController::BeginPlay()
 	bShowMouseCursor = true;
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
+	bIsPaused = false;
+	if (UWorld* World = GetWorld())
+	{
+		if (AWorldSettings* Settings = World->GetWorldSettings())
+		{
+			Settings->SetPauserPlayerState(nullptr);
+		}
+		UGameplayStatics::SetGamePaused(World, false);
+	}
+	SetPause(false);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->EnableInput(this);
+	}
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
@@ -141,6 +164,74 @@ void ATDPlayerController::PlaceOverviewCamera()
 		PlayerCameraManager->ViewPitchMax = -20.f;
 		PlayerCameraManager->SetGameCameraCutThisFrame();
 	}
+
+	ClampOverviewCamera();
+}
+
+void ATDPlayerController::Tick(float DeltaTime)
+{
+	Super::Tick(DeltaTime);
+	ClampOverviewCamera();
+}
+
+void ATDPlayerController::ClampOverviewCamera()
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!ControlledPawn)
+	{
+		return;
+	}
+
+	if (!TerrainRef)
+	{
+		TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
+	}
+	if (!TerrainRef)
+	{
+		return;
+	}
+
+	const float StepX = TerrainRef->TileDimensions.X + TerrainRef->TileSpacing;
+	const float StepY = TerrainRef->TileDimensions.Y + TerrainRef->TileSpacing;
+	const FVector Origin = TerrainRef->GetActorLocation();
+	const float BoardX = TerrainRef->GridWidth * StepX;
+	const float BoardY = TerrainRef->GridHeight * StepY;
+	const float MarginX = BoardX * 0.12f;
+	const float MarginY = BoardY * 0.12f;
+	const float BoardSpan = FMath::Max(BoardX, BoardY);
+	const float MinZ = Origin.Z + 280.f;
+	const float MaxHeightAbove = FMath::Clamp(BoardSpan * 0.65f, OverviewCameraHeight, OverviewCameraHeight * 2.2f);
+	const float MaxZ = Origin.Z + MaxHeightAbove;
+
+	FVector Loc = ControlledPawn->GetActorLocation();
+	const FVector Clamped(
+		FMath::Clamp(Loc.X, Origin.X - MarginX, Origin.X + BoardX + MarginX),
+		FMath::Clamp(Loc.Y, Origin.Y - MarginY, Origin.Y + BoardY + MarginY),
+		FMath::Clamp(Loc.Z, MinZ, MaxZ));
+
+	if (Clamped.Equals(Loc, 0.5f))
+	{
+		return;
+	}
+
+	ControlledPawn->SetActorLocation(Clamped, false, nullptr, ETeleportType::TeleportPhysics);
+	if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent())
+	{
+		FVector Velocity = Movement->Velocity;
+		if (!FMath::IsNearlyEqual(Clamped.X, Loc.X))
+		{
+			Velocity.X = 0.f;
+		}
+		if (!FMath::IsNearlyEqual(Clamped.Y, Loc.Y))
+		{
+			Velocity.Y = 0.f;
+		}
+		if (!FMath::IsNearlyEqual(Clamped.Z, Loc.Z))
+		{
+			Velocity.Z = 0.f;
+		}
+		Movement->Velocity = Velocity;
+	}
 }
 
 void ATDPlayerController::RestartMatch()
@@ -151,8 +242,30 @@ void ATDPlayerController::RestartMatch()
 		return;
 	}
 
+	if (AWorldSettings* Settings = World->GetWorldSettings())
+	{
+		Settings->SetPauserPlayerState(nullptr);
+	}
+	UGameplayStatics::SetGamePaused(World, false);
 	SetPause(false);
 	bIsPaused = false;
+
+	if (GameOverInstance)
+	{
+		GameOverInstance->RemoveFromParent();
+		GameOverInstance = nullptr;
+	}
+	if (PauseMenuInstance)
+	{
+		PauseMenuInstance->RemoveFromParent();
+		PauseMenuInstance = nullptr;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
 
 	const FString LevelName = UGameplayStatics::GetCurrentLevelName(World, true);
 	UGameplayStatics::OpenLevel(this, FName(*LevelName));
