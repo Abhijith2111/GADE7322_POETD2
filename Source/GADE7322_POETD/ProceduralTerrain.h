@@ -184,6 +184,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Terrain")
 	FVector GetStepVector(const FIntPoint& Direction) const;
 
+	UFUNCTION(BlueprintPure, Category = "Terrain")
+	bool WorldToGridCell(const FVector& WorldLocation, FIntPoint& OutCell) const;
+
+	UFUNCTION(BlueprintPure, Category = "Terrain")
+	bool FindBuildSlotAtWorld(const FVector& WorldLocation, int32& OutIndex, FVector& OutLocation) const;
+
 private:
 	FRandomStream RandomStream;
 	TSet<FIntPoint> PathCellSet;

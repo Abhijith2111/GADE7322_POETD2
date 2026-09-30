@@ -6,6 +6,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EnemyBase.h"
+#include "CentralTowerBase.h"
 #include "HealthBarWidget.h"
 
 ADefenderBase::ADefenderBase()
@@ -42,18 +43,28 @@ ADefenderBase::ADefenderBase()
 void ADefenderBase::SnapToGround()
 {
 	UWorld* World = GetWorld();
-	if (!World || !DefenderMesh)
+	if (!World || !DefenderMesh || !DefenderMesh->GetStaticMesh())
 	{
 		return;
 	}
 
 	const FVector ActorLoc = GetActorLocation();
-	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 2500.f);
-	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 5000.f);
+	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 5000.f);
+	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 10000.f);
 
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderGroundSnap), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderGroundSnap), true, this);
 	Params.AddIgnoredActor(this);
+
+	TArray<AActor*> IgnoreActors;
+	UGameplayStatics::GetAllActorsOfClass(World, ADefenderBase::StaticClass(), IgnoreActors);
+	Params.AddIgnoredActors(IgnoreActors);
+	TArray<AActor*> Towers;
+	UGameplayStatics::GetAllActorsOfClass(World, ACentralTowerBase::StaticClass(), Towers);
+	Params.AddIgnoredActors(Towers);
+	TArray<AActor*> Enemies;
+	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBase::StaticClass(), Enemies);
+	Params.AddIgnoredActors(Enemies);
 
 	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params)
 		&& !World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, Params))
@@ -61,15 +72,22 @@ void ADefenderBase::SnapToGround()
 		return;
 	}
 
-	float BottomOffset = 0.f;
-	if (DefenderMesh->GetStaticMesh())
-	{
-		const FBox LocalBounds = DefenderMesh->GetStaticMesh()->GetBoundingBox();
-		const FVector Scale = DefenderMesh->GetComponentScale();
-		BottomOffset = LocalBounds.Min.Z * Scale.Z;
-	}
+	// Pivot is not at the visual feet for ArcherTowerT1 — lift by local mesh Min.Z so the
+	// bottom of the mesh AABB sits on the tile surface (same idea as the temple snap).
+	const FBox LocalBox = DefenderMesh->GetStaticMesh()->GetBoundingBox();
+	const float ScaleZ = DefenderMesh->GetComponentScale().Z;
+	const float SurfaceZ = Hit.ImpactPoint.Z + 2.f;
+	const float NewActorZ = SurfaceZ - (LocalBox.Min.Z * ScaleZ);
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, NewActorZ));
 
-	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z - BottomOffset + 2.f));
+	DefenderMesh->UpdateBounds();
+	const FBoxSphereBounds WorldBounds = DefenderMesh->Bounds;
+	const float CurrentBottom = WorldBounds.Origin.Z - WorldBounds.BoxExtent.Z;
+	const float Fixup = SurfaceZ - CurrentBottom;
+	if (!FMath::IsNearlyZero(Fixup, 0.5f))
+	{
+		SetActorLocation(GetActorLocation() + FVector(0.f, 0.f, Fixup));
+	}
 }
 
 void ADefenderBase::BeginPlay()
@@ -79,10 +97,19 @@ void ADefenderBase::BeginPlay()
 	if (UStaticMesh* ArcherMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT1.ArcherTowerT1")))
 	{
 		DefenderMesh->SetStaticMesh(ArcherMesh);
+		DefenderMesh->SetRelativeLocation(FVector::ZeroVector);
+		DefenderMesh->SetRelativeRotation(FRotator::ZeroRotator);
 		DefenderMesh->SetWorldScale3D(FVector(1.f));
 	}
 
 	SnapToGround();
+
+	// Mesh/collision can finish registering a frame late — re-snap once more.
+	if (UWorld* World = GetWorld())
+	{
+		FTimerHandle ResnapHandle;
+		World->GetTimerManager().SetTimer(ResnapHandle, FTimerDelegate::CreateUObject(this, &ADefenderBase::SnapToGround), 0.05f, false);
+	}
 
 	if (DefenderMesh && DefenderMesh->GetStaticMesh())
 	{

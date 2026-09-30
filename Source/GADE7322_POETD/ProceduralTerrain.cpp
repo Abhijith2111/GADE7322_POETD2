@@ -17,7 +17,11 @@ AProceduralTerrain::AProceduralTerrain()
 		{
 			UInstancedStaticMeshComponent* ISM = CreateDefaultSubobject<UInstancedStaticMeshComponent>(Name);
 			ISM->SetupAttachment(RootComponent);
-			ISM->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			ISM->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+			ISM->SetCollisionResponseToAllChannels(ECR_Ignore);
+			ISM->SetCollisionResponseToChannel(ECC_Visibility, ECR_Block);
+			ISM->SetCollisionResponseToChannel(ECC_WorldStatic, ECR_Block);
+			ISM->SetGenerateOverlapEvents(false);
 			ISM->SetMobility(EComponentMobility::Movable);
 			return ISM;
 		};
@@ -146,7 +150,8 @@ FVector AProceduralTerrain::GridToWorldLocation(int32 GridX, int32 GridY) const
 {
 	const float StepX = TileDimensions.X + TileSpacing;
 	const float StepY = TileDimensions.Y + TileSpacing;
-	return GetActorLocation() + FVector(GridX * StepX, GridY * StepY, 0.f);
+	// Cell centers (not corners) so build points and tiles share the same visual center.
+	return GetActorLocation() + FVector((GridX + 0.5f) * StepX, (GridY + 0.5f) * StepY, 0.f);
 }
 
 FVector AProceduralTerrain::GetStepVector(const FIntPoint& Direction) const
@@ -154,6 +159,59 @@ FVector AProceduralTerrain::GetStepVector(const FIntPoint& Direction) const
 	const float StepX = TileDimensions.X + TileSpacing;
 	const float StepY = TileDimensions.Y + TileSpacing;
 	return FVector(Direction.X * StepX, Direction.Y * StepY, 0.f);
+}
+
+bool AProceduralTerrain::WorldToGridCell(const FVector& WorldLocation, FIntPoint& OutCell) const
+{
+	const float StepX = TileDimensions.X + TileSpacing;
+	const float StepY = TileDimensions.Y + TileSpacing;
+	if (StepX <= KINDA_SMALL_NUMBER || StepY <= KINDA_SMALL_NUMBER)
+	{
+		return false;
+	}
+
+	const FVector Local = WorldLocation - GetActorLocation();
+	OutCell = FIntPoint(FMath::FloorToInt(Local.X / StepX), FMath::FloorToInt(Local.Y / StepY));
+	return OutCell.X >= 0 && OutCell.X < GridWidth && OutCell.Y >= 0 && OutCell.Y < GridHeight;
+}
+
+bool AProceduralTerrain::FindBuildSlotAtWorld(const FVector& WorldLocation, int32& OutIndex, FVector& OutLocation) const
+{
+	FIntPoint ClickedCell;
+	if (WorldToGridCell(WorldLocation, ClickedCell))
+	{
+		for (int32 i = 0; i < BuildGridCells.Num(); ++i)
+		{
+			if (BuildGridCells[i] == ClickedCell)
+			{
+				OutIndex = i;
+				OutLocation = BuildGridLocations[i];
+				return true;
+			}
+		}
+	}
+
+	int32 BestIndex = INDEX_NONE;
+	float BestDistSq = FLT_MAX;
+	for (int32 i = 0; i < BuildGridLocations.Num(); ++i)
+	{
+		const float DistSq = FVector::DistSquared2D(WorldLocation, BuildGridLocations[i]);
+		if (DistSq < BestDistSq)
+		{
+			BestDistSq = DistSq;
+			BestIndex = i;
+		}
+	}
+
+	const float SnapRadius = FMath::Max(TileDimensions.X, TileDimensions.Y) * 0.55f;
+	if (BestIndex == INDEX_NONE || BestDistSq > FMath::Square(SnapRadius))
+	{
+		return false;
+	}
+
+	OutIndex = BestIndex;
+	OutLocation = BuildGridLocations[BestIndex];
+	return true;
 }
 
 void AProceduralTerrain::DetectTileDimensionsFromMesh()
@@ -421,10 +479,12 @@ void AProceduralTerrain::SpawnTileInstance(UInstancedStaticMeshComponent* ISM, c
 		1.f);
 
 	const FRotator Rotation(0.f, Yaw, 0.f);
-	const FVector LocalCenterOffsetXY(Bounds.Origin.X * Scale.X, Bounds.Origin.Y * Scale.Y, 0.f);
-	const FVector RotatedOffset = Rotation.RotateVector(LocalCenterOffsetXY);
 	const FVector CellCenter = GridToWorldLocation(Cell.X, Cell.Y) + FVector(0.f, 0.f, ZOffset);
-	const FVector PivotLocation = CellCenter - RotatedOffset;
+
+	// Center the mesh on the cell using its local bounds origin (XY only).
+	const FVector LocalCenter(Bounds.Origin.X * Scale.X, Bounds.Origin.Y * Scale.Y, Bounds.Origin.Z * Scale.Z);
+	const FVector RotatedCenter = Rotation.RotateVector(LocalCenter);
+	const FVector PivotLocation = CellCenter - FVector(RotatedCenter.X, RotatedCenter.Y, 0.f);
 
 	ISM->AddInstance(FTransform(Rotation, PivotLocation, Scale));
 }

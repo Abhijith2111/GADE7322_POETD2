@@ -53,7 +53,7 @@ void ACentralTowerBase::SnapToGround()
 	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 5000.f);
 
 	FHitResult Hit;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(CentralTowerGroundSnap), false, this);
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(CentralTowerGroundSnap), true, this);
 	Params.AddIgnoredActor(this);
 
 	if (!World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params)
@@ -62,15 +62,12 @@ void ACentralTowerBase::SnapToGround()
 		return;
 	}
 
-	float BottomOffset = 0.f;
-	if (TowerMesh->GetStaticMesh())
-	{
-		const FBox LocalBounds = TowerMesh->GetStaticMesh()->GetBoundingBox();
-		const FVector Scale = TowerMesh->GetComponentScale();
-		BottomOffset = LocalBounds.Min.Z * Scale.Z;
-	}
-
-	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z - BottomOffset + 2.f));
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z));
+	TowerMesh->UpdateBounds();
+	const FBoxSphereBounds Bounds = TowerMesh->Bounds;
+	const float CurrentBottom = Bounds.Origin.Z - Bounds.BoxExtent.Z;
+	const float DesiredBottom = Hit.ImpactPoint.Z + 4.f;
+	SetActorLocation(GetActorLocation() + FVector(0.f, 0.f, DesiredBottom - CurrentBottom));
 
 	if (TowerMesh->GetStaticMesh())
 	{

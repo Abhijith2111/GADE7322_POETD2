@@ -332,33 +332,7 @@ bool ATDPlayerController::FindNearestBuildLocation(const FVector& ClickLocation,
 		return false;
 	}
 
-	int32 BestIndex = INDEX_NONE;
-	float BestDistSq = FLT_MAX;
-
-	for (int32 i = 0; i < TerrainRef->BuildGridLocations.Num(); ++i)
-	{
-		const float DistSq = FVector::DistSquared(ClickLocation, TerrainRef->BuildGridLocations[i]);
-		if (DistSq < BestDistSq)
-		{
-			BestDistSq = DistSq;
-			BestIndex = i;
-		}
-	}
-
-	if (BestIndex == INDEX_NONE)
-	{
-		return false;
-	}
-
-	const float SnapRadius = FMath::Max(TerrainRef->TileDimensions.X, TerrainRef->TileDimensions.Y) * 0.5f;
-	if (BestDistSq > FMath::Square(SnapRadius))
-	{
-		return false;
-	}
-
-	OutIndex = BestIndex;
-	OutLocation = TerrainRef->BuildGridLocations[BestIndex];
-	return true;
+	return TerrainRef->FindBuildSlotAtWorld(ClickLocation, OutIndex, OutLocation);
 }
 
 bool ATDPlayerController::IsFarEnoughFromPathways(const FVector& Location) const
@@ -370,7 +344,7 @@ bool ATDPlayerController::IsFarEnoughFromPathways(const FVector& Location) const
 
 	for (const FVector& Node : TerrainRef->PathwayNodes)
 	{
-		if (FVector::DistSquared(Location, Node) < FMath::Square(PathExclusionDistance))
+		if (FVector::DistSquared2D(Location, Node) < FMath::Square(PathExclusionDistance))
 		{
 			return false;
 		}
@@ -402,7 +376,7 @@ void ATDPlayerController::TryPlaceDefender()
 
 	FVector SnappedLocation;
 	int32 GridIndex;
-	if (!FindNearestBuildLocation(Hit.Location, SnappedLocation, GridIndex))
+	if (!FindNearestBuildLocation(Hit.ImpactPoint, SnappedLocation, GridIndex))
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("Clicked location is not near a valid build cell."));
 		return;
@@ -435,7 +409,21 @@ void ATDPlayerController::TryPlaceDefender()
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	ADefenderBase* NewDefender = GetWorld()->SpawnActor<ADefenderBase>(DefenderClass, SnappedLocation, FRotator::ZeroRotator, SpawnParams);
+	// Raise spawn Z to the tile surface before BeginPlay snap, so the tower never starts under the map.
+	FVector DefenderSpawnPoint = SnappedLocation;
+	{
+		const FVector TraceStart(SnappedLocation.X, SnappedLocation.Y, SnappedLocation.Z + 5000.f);
+		const FVector TraceEnd(SnappedLocation.X, SnappedLocation.Y, SnappedLocation.Z - 10000.f);
+		FHitResult GroundHit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderSpawnGround), true);
+		if (GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_Visibility, Params)
+			|| GetWorld()->LineTraceSingleByChannel(GroundHit, TraceStart, TraceEnd, ECC_WorldStatic, Params))
+		{
+			DefenderSpawnPoint.Z = GroundHit.ImpactPoint.Z + 2.f;
+		}
+	}
+
+	ADefenderBase* NewDefender = GetWorld()->SpawnActor<ADefenderBase>(DefenderClass, DefenderSpawnPoint, FRotator::ZeroRotator, SpawnParams);
 	if (!NewDefender)
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("Failed to spawn defender."));
