@@ -16,6 +16,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual bool ShouldEngageDefenders() const override;
+	virtual bool ShouldBypassFights() const override;
 	virtual void UpdateMovementAndCombat(float DeltaTime) override;
 	virtual void OnReachedTower(ACentralTowerBase* Tower) override;
 	virtual void HandleDeath() override;

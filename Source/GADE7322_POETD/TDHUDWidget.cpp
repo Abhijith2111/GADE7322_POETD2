@@ -1,6 +1,7 @@
 #include "TDHUDWidget.h"
 #include "DefenderButtonWidget.h"
 #include "DefenderBog.h"
+#include "DefenderBarracks.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Components/PanelWidget.h"
@@ -157,6 +158,7 @@ void UTDHUDWidget::EnsureDefenderButton()
 
 	AddBuyButton(nullptr, 100, NSLOCTEXT("UI", "Archer", "Archer"));
 	AddBuyButton(ADefenderBog::StaticClass(), 200, NSLOCTEXT("UI", "Bog", "Bog"));
+	AddBuyButton(ADefenderBarracks::StaticClass(), 250, NSLOCTEXT("UI", "Knights", "Knights"));
 }
 
 void UTDHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)

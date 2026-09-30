@@ -39,6 +39,7 @@ void AEnemyBrute::BeginPlay()
 {
 	Super::BeginPlay();
 
+	AllowPassThroughFights();
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 
 	if (USkeletalMeshComponent* CharMesh = GetMesh())
@@ -70,6 +71,11 @@ void AEnemyBrute::BeginPlay()
 bool AEnemyBrute::ShouldEngageDefenders() const
 {
 	return false;
+}
+
+bool AEnemyBrute::ShouldBypassFights() const
+{
+	return true;
 }
 
 void AEnemyBrute::UpdateMovementAndCombat(float DeltaTime)

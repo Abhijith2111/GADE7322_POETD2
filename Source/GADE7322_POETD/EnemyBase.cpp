@@ -4,9 +4,11 @@
 #include "DrawDebugHelpers.h"
 #include "TimerManager.h"
 #include "DefenderBase.h"
+#include "DefenderKnight.h"
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
 #include "HealthBarWidget.h"
+#include "Components/CapsuleComponent.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -131,9 +133,75 @@ void AEnemyBase::UpdateBogPull(float DeltaTime)
 	SetActorLocation(FVector(Next.X, Next.Y, Current.Z), false);
 }
 
+bool AEnemyBase::IsEngagedInFight() const
+{
+	return bIsAttacking && !bIsDefeated && !bIsBeingEaten;
+}
+
 bool AEnemyBase::ShouldEngageDefenders() const
 {
 	return true;
+}
+
+bool AEnemyBase::ShouldBypassFights() const
+{
+	return false;
+}
+
+void AEnemyBase::AllowPassThroughFights()
+{
+	if (UCapsuleComponent* Capsule = GetCapsuleComponent())
+	{
+		Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	}
+}
+
+FVector AEnemyBase::SteerAroundFights(const FVector& DesiredDir) const
+{
+	if (DesiredDir.IsNearlyZero())
+	{
+		return DesiredDir;
+	}
+
+	TArray<AActor*> Others;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), Others);
+
+	FVector Avoid = FVector::ZeroVector;
+	const FVector MyLoc = GetActorLocation();
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, DesiredDir).GetSafeNormal();
+	constexpr float AvoidRadius = 320.f;
+
+	for (AActor* Actor : Others)
+	{
+		const AEnemyBase* Other = Cast<AEnemyBase>(Actor);
+		if (!Other || Other == this || !Other->IsEngagedInFight())
+		{
+			continue;
+		}
+
+		const FVector FromOther = MyLoc - Other->GetActorLocation();
+		const float Dist = FromOther.Size2D();
+		if (Dist > AvoidRadius || Dist < 1.f)
+		{
+			continue;
+		}
+
+		const FVector AwayDir = FromOther.GetSafeNormal2D();
+		if (FVector::DotProduct(DesiredDir, (Other->GetActorLocation() - MyLoc).GetSafeNormal2D()) < 0.f)
+		{
+			continue;
+		}
+
+		const float SideSign = FVector::DotProduct(Side, AwayDir) >= 0.f ? 1.f : -1.f;
+		Avoid += Side * SideSign * (1.f - Dist / AvoidRadius);
+	}
+
+	if (Avoid.IsNearlyZero())
+	{
+		return DesiredDir;
+	}
+
+	return (DesiredDir + Avoid * 2.4f).GetSafeNormal2D();
 }
 
 void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
@@ -188,7 +256,12 @@ void AEnemyBase::FollowPath(float DeltaTime)
 	{
 		if (Tower)
 		{
-			AddMovementInput((Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+			FVector MoveDir = (Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			if (ShouldBypassFights())
+			{
+				MoveDir = SteerAroundFights(MoveDir);
+			}
+			AddMovementInput(MoveDir);
 		}
 		return;
 	}
@@ -212,7 +285,12 @@ void AEnemyBase::FollowPath(float DeltaTime)
 		return;
 	}
 
-	AddMovementInput(ToWaypoint.GetSafeNormal2D());
+	FVector MoveDir = ToWaypoint.GetSafeNormal2D();
+	if (ShouldBypassFights())
+	{
+		MoveDir = SteerAroundFights(MoveDir);
+	}
+	AddMovementInput(MoveDir);
 	DrawDebugSphere(GetWorld(), TargetWaypoint, 20.f, 6, FColor::Yellow, false, 0.05f);
 }
 
@@ -240,7 +318,9 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderBase::StaticClass(), Defenders);
 
 	ADefenderBase* Nearest = nullptr;
+	ADefenderKnight* NearestKnight = nullptr;
 	float NearestDistSq = FMath::Square(Range);
+	float NearestKnightDistSq = NearestDistSq;
 
 	for (AActor* Actor : Defenders)
 	{
@@ -253,12 +333,29 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 		const FVector SelfLoc = FVector(GetActorLocation().X, GetActorLocation().Y, 0.f);
 		const FVector DefLoc = FVector(Defender->GetActorLocation().X, Defender->GetActorLocation().Y, 0.f);
 		const float DistSq = FVector::DistSquared(SelfLoc, DefLoc);
+		if (DistSq > NearestDistSq && DistSq > NearestKnightDistSq)
+		{
+			continue;
+		}
 
-		if (DistSq <= NearestDistSq)
+		if (ADefenderKnight* Knight = Cast<ADefenderKnight>(Defender))
+		{
+			if (DistSq <= NearestKnightDistSq)
+			{
+				NearestKnightDistSq = DistSq;
+				NearestKnight = Knight;
+			}
+		}
+		else if (DistSq <= NearestDistSq)
 		{
 			NearestDistSq = DistSq;
 			Nearest = Defender;
 		}
+	}
+
+	if (ShouldEngageDefenders() && NearestKnight)
+	{
+		return NearestKnight;
 	}
 
 	return Nearest;

@@ -77,6 +77,7 @@ public:
 
 	void BeginBogPull(AActor* Bog);
 	bool IsBeingEaten() const;
+	bool IsEngagedInFight() const;
 
 protected:
 	TArray<FVector> Waypoints;
@@ -91,6 +92,9 @@ protected:
 	FTimerHandle AttackTimerHandle;
 
 	virtual bool ShouldEngageDefenders() const;
+	virtual bool ShouldBypassFights() const;
+	void AllowPassThroughFights();
+	FVector SteerAroundFights(const FVector& DesiredDir) const;
 	virtual void UpdateMovementAndCombat(float DeltaTime);
 	virtual void OnReachedTower(ACentralTowerBase* Tower);
 	virtual void FollowPath(float DeltaTime);

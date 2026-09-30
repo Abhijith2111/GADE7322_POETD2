@@ -16,6 +16,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual bool ShouldEngageDefenders() const override;
+	virtual bool ShouldBypassFights() const override;
 	virtual void UpdateMovementAndCombat(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")

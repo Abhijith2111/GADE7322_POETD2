@@ -49,6 +49,7 @@ void AEnemyTrojanHorse::BeginPlay()
 {
 	Super::BeginPlay();
 
+	AllowPassThroughFights();
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 	bHasBurst = false;
 
@@ -86,6 +87,11 @@ void AEnemyTrojanHorse::BeginPlay()
 bool AEnemyTrojanHorse::ShouldEngageDefenders() const
 {
 	return false;
+}
+
+bool AEnemyTrojanHorse::ShouldBypassFights() const
+{
+	return true;
 }
 
 void AEnemyTrojanHorse::UpdateMovementAndCombat(float DeltaTime)
