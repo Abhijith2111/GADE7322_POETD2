@@ -73,7 +73,62 @@ void AEnemyBase::Tick(float DeltaTime)
 		return;
 	}
 
+	if (bIsBeingEaten)
+	{
+		UpdateBogPull(DeltaTime);
+		return;
+	}
+
 	UpdateMovementAndCombat(DeltaTime);
+}
+
+void AEnemyBase::BeginBogPull(AActor* Bog)
+{
+	if (bIsDefeated || !Bog)
+	{
+		return;
+	}
+
+	bIsBeingEaten = true;
+	BogPullTarget = Bog;
+	bIsAttacking = false;
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->StopMovementImmediately();
+		Movement->DisableMovement();
+	}
+}
+
+bool AEnemyBase::IsBeingEaten() const
+{
+	return bIsBeingEaten;
+}
+
+void AEnemyBase::UpdateBogPull(float DeltaTime)
+{
+	if (!BogPullTarget.IsValid())
+	{
+		bIsBeingEaten = false;
+		if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+		{
+			Movement->SetMovementMode(MOVE_Walking);
+			Movement->MaxWalkSpeed = MoveSpeed;
+		}
+		return;
+	}
+
+	const FVector Current = GetActorLocation();
+	const FVector ToBog = BogPullTarget->GetActorLocation() - Current;
+	const float Dist = ToBog.Size2D();
+	if (Dist <= 70.f)
+	{
+		return;
+	}
+
+	const float Step = FMath::Max(MoveSpeed, 200.f) * 3.f * DeltaTime;
+	const FVector Next = Current + ToBog.GetSafeNormal2D() * FMath::Min(Step, Dist);
+	SetActorLocation(FVector(Next.X, Next.Y, Current.Z), false);
 }
 
 bool AEnemyBase::ShouldEngageDefenders() const

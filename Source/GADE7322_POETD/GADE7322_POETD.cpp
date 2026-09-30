@@ -1,5 +1,3 @@
-// Copyright Epic Games, Inc. All Rights Reserved.
-
 #include "GADE7322_POETD.h"
 #include "Modules/ModuleManager.h"
 

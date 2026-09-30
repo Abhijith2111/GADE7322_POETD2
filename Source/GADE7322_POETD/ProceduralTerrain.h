@@ -190,6 +190,9 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Terrain")
 	bool FindBuildSlotAtWorld(const FVector& WorldLocation, int32& OutIndex, FVector& OutLocation) const;
 
+	UFUNCTION(BlueprintPure, Category = "Terrain")
+	bool IsWorldOnPath(const FVector& WorldLocation) const;
+
 private:
 	FRandomStream RandomStream;
 	TSet<FIntPoint> PathCellSet;

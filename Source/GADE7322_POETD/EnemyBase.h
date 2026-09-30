@@ -75,12 +75,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsDefeated() const;
 
+	void BeginBogPull(AActor* Bog);
+	bool IsBeingEaten() const;
+
 protected:
 	TArray<FVector> Waypoints;
 	int32 CurrentWaypointIndex = 0;
 	bool bIsDefeated = false;
 	bool bIsAttacking = false;
+	bool bIsBeingEaten = false;
 	bool bWaypointsInitialised = false;
+
+	TWeakObjectPtr<AActor> BogPullTarget;
 
 	FTimerHandle AttackTimerHandle;
 
@@ -89,6 +95,7 @@ protected:
 	virtual void OnReachedTower(ACentralTowerBase* Tower);
 	virtual void FollowPath(float DeltaTime);
 	virtual void HandleDeath();
+	void UpdateBogPull(float DeltaTime);
 
 	ADefenderBase* FindNearestDefender(float Range) const;
 	ACentralTowerBase* FindCentralTower() const;

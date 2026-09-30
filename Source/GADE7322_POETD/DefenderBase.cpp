@@ -40,17 +40,34 @@ ADefenderBase::ADefenderBase()
 	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 100.f), FVector2D(56.f, 8.f));
 }
 
+void ADefenderBase::SeatMeshOnPivot()
+{
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	if (DefenderMesh->GetAttachParent())
+	{
+		DefenderMesh->SetRelativeLocation(FVector::ZeroVector);
+		DefenderMesh->SetRelativeRotation(FRotator::ZeroRotator);
+	}
+
+	DefenderMesh->SetHiddenInGame(false);
+	DefenderMesh->SetVisibility(true, true);
+}
+
 void ADefenderBase::SnapToGround()
 {
 	UWorld* World = GetWorld();
-	if (!World || !DefenderMesh || !DefenderMesh->GetStaticMesh())
+	if (!World || !DefenderMesh)
 	{
 		return;
 	}
 
 	const FVector ActorLoc = GetActorLocation();
-	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 5000.f);
-	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 10000.f);
+	const FVector TraceStart(ActorLoc.X, ActorLoc.Y, ActorLoc.Z + 2500.f);
+	const FVector TraceEnd(ActorLoc.X, ActorLoc.Y, ActorLoc.Z - 5000.f);
 
 	FHitResult Hit;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderGroundSnap), true, this);
@@ -72,21 +89,29 @@ void ADefenderBase::SnapToGround()
 		return;
 	}
 
-	// Pivot is not at the visual feet for ArcherTowerT1 — lift by local mesh Min.Z so the
-	// bottom of the mesh AABB sits on the tile surface (same idea as the temple snap).
-	const FBox LocalBox = DefenderMesh->GetStaticMesh()->GetBoundingBox();
-	const float ScaleZ = DefenderMesh->GetComponentScale().Z;
-	const float SurfaceZ = Hit.ImpactPoint.Z + 2.f;
-	const float NewActorZ = SurfaceZ - (LocalBox.Min.Z * ScaleZ);
-	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, NewActorZ));
-
+	SetActorLocation(FVector(ActorLoc.X, ActorLoc.Y, Hit.ImpactPoint.Z));
 	DefenderMesh->UpdateBounds();
-	const FBoxSphereBounds WorldBounds = DefenderMesh->Bounds;
-	const float CurrentBottom = WorldBounds.Origin.Z - WorldBounds.BoxExtent.Z;
-	const float Fixup = SurfaceZ - CurrentBottom;
-	if (!FMath::IsNearlyZero(Fixup, 0.5f))
+	const FBoxSphereBounds Bounds = DefenderMesh->Bounds;
+	const float CurrentBottom = Bounds.Origin.Z - Bounds.BoxExtent.Z;
+	const float DesiredBottom = Hit.ImpactPoint.Z + 4.f;
+	const FVector Correction(
+		ActorLoc.X - Bounds.Origin.X,
+		ActorLoc.Y - Bounds.Origin.Y,
+		DesiredBottom - CurrentBottom);
+	SetActorLocation(GetActorLocation() + Correction);
+}
+
+void ADefenderBase::ApplyDefenderMesh()
+{
+	if (!DefenderMesh)
 	{
-		SetActorLocation(GetActorLocation() + FVector(0.f, 0.f, Fixup));
+		return;
+	}
+
+	if (UStaticMesh* ArcherMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT1.ArcherTowerT1")))
+	{
+		DefenderMesh->SetStaticMesh(ArcherMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
 	}
 }
 
@@ -94,28 +119,19 @@ void ADefenderBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (UStaticMesh* ArcherMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT1.ArcherTowerT1")))
-	{
-		DefenderMesh->SetStaticMesh(ArcherMesh);
-		DefenderMesh->SetRelativeLocation(FVector::ZeroVector);
-		DefenderMesh->SetRelativeRotation(FRotator::ZeroRotator);
-		DefenderMesh->SetWorldScale3D(FVector(1.f));
-	}
-
+	ApplyDefenderMesh();
+	SeatMeshOnPivot();
 	SnapToGround();
-
-	// Mesh/collision can finish registering a frame late — re-snap once more.
-	if (UWorld* World = GetWorld())
-	{
-		FTimerHandle ResnapHandle;
-		World->GetTimerManager().SetTimer(ResnapHandle, FTimerDelegate::CreateUObject(this, &ADefenderBase::SnapToGround), 0.05f, false);
-	}
 
 	if (DefenderMesh && DefenderMesh->GetStaticMesh())
 	{
 		const FBox LocalBounds = DefenderMesh->GetStaticMesh()->GetBoundingBox();
-		const float TopZ = LocalBounds.Max.Z * DefenderMesh->GetComponentScale().Z;
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 20.f), FVector2D(72.f, 10.f));
+		const float ScaleZ = FMath::Max(DefenderMesh->GetComponentScale().Z, KINDA_SMALL_NUMBER);
+		const FVector BarOffset(
+			(LocalBounds.Min.X + LocalBounds.Max.X) * 0.5f,
+			(LocalBounds.Min.Y + LocalBounds.Max.Y) * 0.5f,
+			LocalBounds.Max.Z + (24.f / ScaleZ));
+		UHealthBarWidget::ConfigureComponent(HealthBarWidget, BarOffset, FVector2D(72.f, 10.f));
 	}
 
 	CurrentHealth = MaxHealth;

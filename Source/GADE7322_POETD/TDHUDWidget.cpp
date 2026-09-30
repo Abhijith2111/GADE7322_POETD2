@@ -1,5 +1,6 @@
 #include "TDHUDWidget.h"
 #include "DefenderButtonWidget.h"
+#include "DefenderBog.h"
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Components/PanelWidget.h"
@@ -123,26 +124,39 @@ void UTDHUDWidget::EnsureDefenderButton()
 		return;
 	}
 
-	UDefenderButtonWidget* BuyBtn = nullptr;
-	if (APlayerController* PC = GetOwningPlayer())
+	auto AddBuyButton = [this](TSubclassOf<ADefenderBase> DefenderType, int32 InCost, const FText& Label)
 	{
-		BuyBtn = CreateWidget<UDefenderButtonWidget>(PC);
-	}
-	else
-	{
-		BuyBtn = CreateWidget<UDefenderButtonWidget>(this);
-	}
+		UDefenderButtonWidget* BuyBtn = nullptr;
+		if (APlayerController* PC = GetOwningPlayer())
+		{
+			BuyBtn = CreateWidget<UDefenderButtonWidget>(PC);
+		}
+		else
+		{
+			BuyBtn = CreateWidget<UDefenderButtonWidget>(this);
+		}
 
-	if (!BuyBtn)
-	{
-		return;
-	}
+		if (!BuyBtn)
+		{
+			return;
+		}
 
-	DefenderButtonContainer->AddChild(BuyBtn);
-	if (IsValid(CachedGameState))
-	{
-		BuyBtn->RefreshAffordability(CachedGameState->GetCurrentMoney());
-	}
+		if (DefenderType)
+		{
+			BuyBtn->DefenderClassToBuild = DefenderType;
+		}
+		BuyBtn->Cost = InCost;
+		BuyBtn->ButtonLabel = Label;
+		DefenderButtonContainer->AddChild(BuyBtn);
+
+		if (IsValid(CachedGameState))
+		{
+			BuyBtn->RefreshAffordability(CachedGameState->GetCurrentMoney());
+		}
+	};
+
+	AddBuyButton(nullptr, 100, NSLOCTEXT("UI", "Archer", "Archer"));
+	AddBuyButton(ADefenderBog::StaticClass(), 200, NSLOCTEXT("UI", "Bog", "Bog"));
 }
 
 void UTDHUDWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)

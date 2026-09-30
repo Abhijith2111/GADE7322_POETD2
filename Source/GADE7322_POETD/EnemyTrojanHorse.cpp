@@ -101,7 +101,7 @@ void AEnemyTrojanHorse::UpdateMovementAndCombat(float DeltaTime)
 	FollowPath(DeltaTime);
 }
 
-void AEnemyTrojanHorse::OnReachedTower(ACentralTowerBase* /*Tower*/)
+void AEnemyTrojanHorse::OnReachedTower(ACentralTowerBase*)
 {
 	Burst();
 }

@@ -11,6 +11,7 @@ UDefenderButtonWidget::UDefenderButtonWidget(const FObjectInitializer& ObjectIni
 	: Super(ObjectInitializer)
 {
 	Cost = 100;
+	ButtonLabel = NSLOCTEXT("UI", "Archer", "Archer");
 
 	static ConstructorHelpers::FClassFinder<ADefenderBase> DefenderBP(TEXT("/Game/Gameplay/LevelObjects/BP_DefenderBase"));
 	if (DefenderBP.Succeeded())
@@ -38,8 +39,12 @@ void UDefenderButtonWidget::NativeConstruct()
 
 	if (CostText)
 	{
+		const FText Label = ButtonLabel.IsEmpty()
+			? NSLOCTEXT("UI", "Defender", "Defender")
+			: ButtonLabel;
 		CostText->SetText(FText::Format(
-			NSLOCTEXT("UI", "CostFormat", "{0} coins"),
+			NSLOCTEXT("UI", "CostFormatNamed", "{0}\n{1} coins"),
+			Label,
 			FText::AsNumber(Cost)));
 	}
 	if (PurchaseButton)

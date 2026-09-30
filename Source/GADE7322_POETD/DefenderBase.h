@@ -25,6 +25,11 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void ScanAndAttack();
+	virtual void ApplyDefenderMesh();
+	AActor* FindNearestTarget() const;
+	void SeatMeshOnPivot();
+	void SnapToGround();
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -66,8 +71,4 @@ public:
 private:
 	bool bIsDestroyed = false;
 	FTimerHandle AttackTimerHandle;
-
-	void ScanAndAttack();
-	AActor* FindNearestTarget() const;
-	void SnapToGround();
 };

@@ -11,6 +11,7 @@
 #include "GameFramework/PawnMovementComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "CentralTowerBase.h"
+#include "DefenderBog.h"
 
 ATDPlayerController::ATDPlayerController()
 {
@@ -406,10 +407,17 @@ void ATDPlayerController::TryPlaceDefender()
 		return;
 	}
 
+	if (DefenderClass->IsChildOf(ADefenderBog::StaticClass())
+		&& TerrainRef
+		&& (TerrainRef->IsWorldOnPath(Hit.ImpactPoint) || TerrainRef->IsWorldOnPath(SnappedLocation)))
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Bogs cannot be placed on the path."));
+		return;
+	}
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// Raise spawn Z to the tile surface before BeginPlay snap, so the tower never starts under the map.
 	FVector DefenderSpawnPoint = SnappedLocation;
 	{
 		const FVector TraceStart(SnappedLocation.X, SnappedLocation.Y, SnappedLocation.Z + 5000.f);

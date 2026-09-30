@@ -20,6 +20,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Defender", meta = (ClampMin = "0"))
 	int32 Cost = 100;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Defender")
+	FText ButtonLabel;
+
 	UPROPERTY(meta = (BindWidgetOptional))
 	class UButton* PurchaseButton;
 

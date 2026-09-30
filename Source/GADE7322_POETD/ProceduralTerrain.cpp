@@ -150,7 +150,6 @@ FVector AProceduralTerrain::GridToWorldLocation(int32 GridX, int32 GridY) const
 {
 	const float StepX = TileDimensions.X + TileSpacing;
 	const float StepY = TileDimensions.Y + TileSpacing;
-	// Cell centers (not corners) so build points and tiles share the same visual center.
 	return GetActorLocation() + FVector((GridX + 0.5f) * StepX, (GridY + 0.5f) * StepY, 0.f);
 }
 
@@ -212,6 +211,17 @@ bool AProceduralTerrain::FindBuildSlotAtWorld(const FVector& WorldLocation, int3
 	OutIndex = BestIndex;
 	OutLocation = BuildGridLocations[BestIndex];
 	return true;
+}
+
+bool AProceduralTerrain::IsWorldOnPath(const FVector& WorldLocation) const
+{
+	FIntPoint Cell;
+	if (!WorldToGridCell(WorldLocation, Cell))
+	{
+		return false;
+	}
+
+	return PathCellSet.Contains(Cell);
 }
 
 void AProceduralTerrain::DetectTileDimensionsFromMesh()
@@ -481,7 +491,6 @@ void AProceduralTerrain::SpawnTileInstance(UInstancedStaticMeshComponent* ISM, c
 	const FRotator Rotation(0.f, Yaw, 0.f);
 	const FVector CellCenter = GridToWorldLocation(Cell.X, Cell.Y) + FVector(0.f, 0.f, ZOffset);
 
-	// Center the mesh on the cell using its local bounds origin (XY only).
 	const FVector LocalCenter(Bounds.Origin.X * Scale.X, Bounds.Origin.Y * Scale.Y, Bounds.Origin.Z * Scale.Z);
 	const FVector RotatedCenter = Rotation.RotateVector(LocalCenter);
 	const FVector PivotLocation = CellCenter - FVector(RotatedCenter.X, RotatedCenter.Y, 0.f);
@@ -509,7 +518,6 @@ void AProceduralTerrain::SpawnPathTiles()
 
 	auto PickTurnISM = [this](int32 CrossZ) -> UInstancedStaticMeshComponent*
 	{
-		// Meshes are authored opposite to the path CrossZ sign, so swap left/right.
 		UInstancedStaticMeshComponent* Preferred = (CrossZ > 0) ? TurnRightTileISM : TurnLeftTileISM;
 		if (Preferred && Preferred->GetStaticMesh())
 		{
