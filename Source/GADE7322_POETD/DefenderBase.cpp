@@ -147,7 +147,23 @@ void ADefenderBase::BeginPlay()
 void ADefenderBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	GetWorldTimerManager().ClearTimer(HitFlashTimer);
+	if (HitFlashState.bActive)
+	{
+		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void ADefenderBase::PlayHitFlash()
+{
+	BeginHitFlash(this, HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	GetWorldTimerManager().SetTimer(HitFlashTimer, this, &ADefenderBase::RestoreHitFlash, 0.12f, false);
+}
+
+void ADefenderBase::RestoreHitFlash()
+{
+	EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
 }
 
 void ADefenderBase::ScanAndAttack()
@@ -172,7 +188,13 @@ void ADefenderBase::ScanAndAttack()
 	UWorld* World = GetWorld();
 	if (World)
 	{
-		DrawDebugLine(World, GetActorLocation(), Target->GetActorLocation(), FColor::Red, false, AttackInterval * 0.5f, 0, 3.f);
+		FVector ShotOrigin = GetActorLocation();
+		if (DefenderMesh)
+		{
+			DefenderMesh->UpdateBounds();
+			ShotOrigin = DefenderMesh->Bounds.Origin;
+		}
+		DrawDebugLine(World, ShotOrigin, Target->GetActorLocation(), FColor::Red, false, AttackInterval * 0.5f, 0, 3.f);
 	}
 
 	UE_LOG(LogTemp, Log, TEXT("Defender %s attacked %s for %.1f damage"), *GetName(), *Target->GetName(), AttackDamage);
@@ -214,6 +236,7 @@ void ADefenderBase::ApplyDamage(float DamageAmount)
 
 	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	PlayHitFlash();
 
 	if (CurrentHealth <= 0.f)
 	{

@@ -4,6 +4,7 @@
 #include "GameFramework/Character.h"
 #include "Components/WidgetComponent.h"
 #include "HealthDisplayInterface.h"
+#include "HitFlash.h"
 #include "EnemyBase.generated.h"
 
 class ADefenderBase;
@@ -90,6 +91,19 @@ protected:
 	TWeakObjectPtr<AActor> BogPullTarget;
 
 	FTimerHandle AttackTimerHandle;
+	FTimerHandle HitFlashTimer;
+	FHitFlashState HitFlashState;
+
+	UPROPERTY()
+	TArray<UMeshComponent*> HitFlashMeshes;
+
+	UPROPERTY()
+	TArray<UMaterialInterface*> HitFlashMaterials;
+
+	void PlayHitFlash();
+
+	UFUNCTION()
+	void RestoreHitFlash();
 
 	virtual bool ShouldEngageDefenders() const;
 	virtual bool ShouldBypassFights() const;

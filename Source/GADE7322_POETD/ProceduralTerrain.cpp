@@ -74,11 +74,6 @@ void AProceduralTerrain::BeginPlay()
 
 	GenerateTerrain();
 
-	if (bDrawDebug)
-	{
-		DrawDebugVisualization();
-	}
-
 	if (CentralTowerClass)
 	{
 		FVector SpawnLocation = CentralTowerLocation;
@@ -123,7 +118,7 @@ void AProceduralTerrain::GenerateTerrain()
 {
 	GridWidth = FMath::Max(GridWidth, 4);
 	GridHeight = FMath::Max(GridHeight, 4);
-	NumPathways = FMath::Max(NumPathways, 3);
+	NumPathways = 3;
 
 	if (bAutoDetectTileDimensions)
 	{
@@ -197,11 +192,6 @@ void AProceduralTerrain::RandomizeSeedAndRegenerate()
 {
 	Seed = FMath::Rand();
 	GenerateTerrain();
-
-	if (bDrawDebug && GetWorld() && GetWorld()->IsGameWorld())
-	{
-		DrawDebugVisualization();
-	}
 }
 
 FVector AProceduralTerrain::GridToWorldLocation(int32 GridX, int32 GridY) const
@@ -380,6 +370,7 @@ FIntPoint AProceduralTerrain::GetRandomEdgeCell(int32 EdgeIndex) const
 void AProceduralTerrain::GeneratePathways()
 {
 	const FIntPoint CenterCell(GridWidth / 2, GridHeight / 2);
+	NumPathways = 3;
 
 	TArray<int32> EdgeOrder = { 0, 1, 2, 3 };
 	for (int32 i = EdgeOrder.Num() - 1; i > 0; --i)
@@ -388,25 +379,16 @@ void AProceduralTerrain::GeneratePathways()
 		EdgeOrder.Swap(i, j);
 	}
 
+	TSet<int32> UsedColumns;
+	TSet<int32> UsedRows;
 	static const FColor PathColors[] = { FColor::Red, FColor::Blue, FColor::Yellow, FColor::Cyan, FColor::Magenta, FColor::Orange };
 
-	for (int32 PathIndex = 0; PathIndex < NumPathways; ++PathIndex)
+	auto BuildLane = [CenterCell](FIntPoint Start, bool bMoveXFirst) -> TArray<FIntPoint>
 	{
-		FProceduralPathway NewPath;
-		NewPath.DebugColor = PathColors[PathIndex % UE_ARRAY_COUNT(PathColors)];
-
-		FIntPoint Current = GetRandomEdgeCell(EdgeOrder[PathIndex % EdgeOrder.Num()]);
-		if (Current == CenterCell)
-		{
-			Current = GetRandomEdgeCell((EdgeOrder[PathIndex % EdgeOrder.Num()] + 1) % 4);
-		}
-
 		TArray<FIntPoint> Cells;
-		Cells.Add(Current);
-
-		const bool bTravelXFirst = RandomStream.FRand() < 0.5f;
-		const int32 Axes[2] = { bTravelXFirst ? 0 : 1, bTravelXFirst ? 1 : 0 };
-
+		Cells.Add(Start);
+		FIntPoint Current = Start;
+		const int32 Axes[2] = { bMoveXFirst ? 0 : 1, bMoveXFirst ? 1 : 0 };
 		for (int32 Axis : Axes)
 		{
 			while ((Axis == 0 && Current.X != CenterCell.X) || (Axis == 1 && Current.Y != CenterCell.Y))
@@ -422,12 +404,87 @@ void AProceduralTerrain::GeneratePathways()
 				Cells.Add(Current);
 			}
 		}
-
 		if (Cells.Last() != CenterCell)
 		{
 			Cells.Add(CenterCell);
 		}
+		return Cells;
+	};
 
+	for (int32 PathIndex = 0; PathIndex < NumPathways; ++PathIndex)
+	{
+		const int32 Edge = EdgeOrder[PathIndex];
+		const bool bHorizontalEdge = (Edge == 0 || Edge == 1);
+		const bool bMoveXFirst = !bHorizontalEdge;
+
+		TArray<int32> Slots;
+		const int32 SlotCount = bHorizontalEdge ? GridWidth : GridHeight;
+		Slots.Reserve(SlotCount);
+		for (int32 Slot = 0; Slot < SlotCount; ++Slot)
+		{
+			Slots.Add(Slot);
+		}
+		for (int32 i = Slots.Num() - 1; i > 0; --i)
+		{
+			const int32 j = RandomStream.RandRange(0, i);
+			Slots.Swap(i, j);
+		}
+
+		TArray<FIntPoint> Cells;
+		for (int32 Slot : Slots)
+		{
+			if (bHorizontalEdge)
+			{
+				if (Slot == CenterCell.X || UsedColumns.Contains(Slot))
+				{
+					continue;
+				}
+			}
+			else if (Slot == CenterCell.Y || UsedRows.Contains(Slot))
+			{
+				continue;
+			}
+
+			FIntPoint Start;
+			switch (Edge)
+			{
+			case 0: Start = FIntPoint(Slot, 0); break;
+			case 1: Start = FIntPoint(Slot, GridHeight - 1); break;
+			case 2: Start = FIntPoint(0, Slot); break;
+			default: Start = FIntPoint(GridWidth - 1, Slot); break;
+			}
+
+			Cells = BuildLane(Start, bMoveXFirst);
+			break;
+		}
+
+		if (Cells.Num() == 0)
+		{
+			const int32 Fallback = bHorizontalEdge
+				? (CenterCell.X == 0 ? 1 : 0)
+				: (CenterCell.Y == 0 ? 1 : 0);
+			FIntPoint Start;
+			switch (Edge)
+			{
+			case 0: Start = FIntPoint(Fallback, 0); break;
+			case 1: Start = FIntPoint(Fallback, GridHeight - 1); break;
+			case 2: Start = FIntPoint(0, Fallback); break;
+			default: Start = FIntPoint(GridWidth - 1, Fallback); break;
+			}
+			Cells = BuildLane(Start, bMoveXFirst);
+		}
+
+		if (bHorizontalEdge)
+		{
+			UsedColumns.Add(Cells[0].X);
+		}
+		else
+		{
+			UsedRows.Add(Cells[0].Y);
+		}
+
+		FProceduralPathway NewPath;
+		NewPath.DebugColor = PathColors[PathIndex % UE_ARRAY_COUNT(PathColors)];
 		for (const FIntPoint& Cell : Cells)
 		{
 			PathCellSet.Add(Cell);

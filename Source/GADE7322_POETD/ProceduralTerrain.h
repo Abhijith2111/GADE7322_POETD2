@@ -71,7 +71,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Grid")
 	UMaterialInterface* TerrainMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "3"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "3", ClampMax = "3"))
 	int32 NumPathways = 3;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "0"))

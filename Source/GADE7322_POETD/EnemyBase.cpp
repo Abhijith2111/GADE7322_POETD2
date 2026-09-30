@@ -54,7 +54,23 @@ void AEnemyBase::BeginPlay()
 void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	GetWorldTimerManager().ClearTimer(HitFlashTimer);
+	if (HitFlashState.bActive)
+	{
+		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AEnemyBase::PlayHitFlash()
+{
+	BeginHitFlash(this, HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	GetWorldTimerManager().SetTimer(HitFlashTimer, this, &AEnemyBase::RestoreHitFlash, 0.12f, false);
+}
+
+void AEnemyBase::RestoreHitFlash()
+{
+	EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
 }
 
 void AEnemyBase::InitialiseWithWaypoints(const TArray<FVector>& InWaypoints)
@@ -436,6 +452,7 @@ void AEnemyBase::TakeDamageFromDefender(float DamageAmount)
 
 	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	PlayHitFlash();
 
 	UE_LOG(LogTemp, Log, TEXT("EnemyBase %s took %.1f damage, %.1f/%.1f HP remaining"), *GetName(), DamageAmount, CurrentHealth, MaxHealth);
 

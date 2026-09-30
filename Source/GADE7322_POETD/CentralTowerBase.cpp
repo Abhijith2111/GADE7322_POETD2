@@ -105,7 +105,23 @@ void ACentralTowerBase::BeginPlay()
 void ACentralTowerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	GetWorldTimerManager().ClearTimer(HitFlashTimer);
+	if (HitFlashState.bActive)
+	{
+		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void ACentralTowerBase::PlayHitFlash()
+{
+	BeginHitFlash(this, HitFlashState, HitFlashMeshes, HitFlashMaterials);
+	GetWorldTimerManager().SetTimer(HitFlashTimer, this, &ACentralTowerBase::RestoreHitFlash, 0.12f, false);
+}
+
+void ACentralTowerBase::RestoreHitFlash()
+{
+	EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
 }
 
 void ACentralTowerBase::ScanAndAttack()
@@ -182,6 +198,7 @@ void ACentralTowerBase::ApplyDamage(float DamageAmount)
 
 	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	PlayHitFlash();
 
 	if (CurrentHealth <= 0.f)
 	{
