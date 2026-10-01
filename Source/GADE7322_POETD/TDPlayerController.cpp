@@ -14,6 +14,7 @@
 #include "Camera/PlayerCameraManager.h"
 #include "CentralTowerBase.h"
 #include "DefenderBog.h"
+#include "DefenderMineShaft.h"
 
 ATDPlayerController::ATDPlayerController()
 {
@@ -666,6 +667,21 @@ void ATDPlayerController::TryPlaceDefender()
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("Bogs cannot be placed on the path."));
 		return;
+	}
+
+	if (DefenderClass->IsChildOf(ADefenderMineShaft::StaticClass()))
+	{
+		TArray<AActor*> ExistingMines;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderMineShaft::StaticClass(), ExistingMines);
+		for (AActor* Actor : ExistingMines)
+		{
+			const ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Actor);
+			if (Mine && !Mine->IsDestroyed())
+			{
+				OnDefenderPlacementFailed.Broadcast(TEXT("Only one mine shaft can be placed."));
+				return;
+			}
+		}
 	}
 
 	FActorSpawnParameters SpawnParams;
