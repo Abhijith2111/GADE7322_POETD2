@@ -1,7 +1,8 @@
 #include "EnemyTrojanHorse.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/CapsuleComponent.h"
+#include "Engine/StaticMesh.h"
 #include "CentralTowerBase.h"
 #include "HealthBarWidget.h"
 #include "TDGameState.h"
@@ -21,12 +22,10 @@ AEnemyTrojanHorse::AEnemyTrojanHorse()
 	CarrierMesh->SetupAttachment(RootComponent);
 	CarrierMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeMesh(TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (CubeMesh.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CartMesh(TEXT("/Game/Buildings/Cart.Cart"));
+	if (CartMesh.Succeeded())
 	{
-		CarrierMesh->SetStaticMesh(CubeMesh.Object);
-		CarrierMesh->SetRelativeScale3D(FVector(2.2f, 1.4f, 1.5f));
-		CarrierMesh->SetRelativeLocation(FVector(0.f, 0.f, 50.f));
+		CarrierMesh->SetStaticMesh(CartMesh.Object);
 	}
 
 	static ConstructorHelpers::FClassFinder<AEnemyBase> NormalEnemyBP(TEXT("/Game/Gameplay/Enemies/Blueprints/BP_EnemyBase"));
@@ -66,19 +65,26 @@ void AEnemyTrojanHorse::BeginPlay()
 
 	if (CarrierMesh)
 	{
-		UMaterialInterface* BaseMat = CarrierMesh->GetMaterial(0);
-		if (!BaseMat)
+		if (UStaticMesh* CartMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Cart.Cart")))
 		{
-			BaseMat = CarrierMesh->GetStaticMesh() ? CarrierMesh->GetStaticMesh()->GetMaterial(0) : nullptr;
+			CarrierMesh->SetStaticMesh(CartMesh);
 		}
-		if (BaseMat)
+
+		if (UStaticMesh* CartAsset = CarrierMesh->GetStaticMesh())
 		{
-			UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (DynMat)
+			const FBox MeshBox = CartAsset->GetBoundingBox();
+			const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
+			const float Scale = 220.f / MeshWidth;
+			CarrierMesh->SetRelativeScale3D(FVector(Scale));
+			CarrierMesh->SetRelativeRotation(FRotator(0.f, -90.f, 0.f));
+
+			const float CapsuleHalf = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.f;
+			CarrierMesh->SetRelativeLocation(FVector(0.f, 0.f, -CapsuleHalf - MeshBox.Min.Z * Scale));
+
+			if (HealthBarWidget)
 			{
-				DynMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.45f, 0.28f, 0.12f));
-				DynMat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.45f, 0.28f, 0.12f));
-				CarrierMesh->SetMaterial(0, DynMat);
+				const float TopZ = -CapsuleHalf + MeshBox.Max.Z * Scale;
+				UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 24.f), FVector2D(160.f, 20.f));
 			}
 		}
 	}

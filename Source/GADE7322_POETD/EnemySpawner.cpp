@@ -2,14 +2,14 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "UObject/ConstructorHelpers.h"
-#include "EnemyBrute.h"
+#include "EnemyOgre.h"
 #include "EnemyTrojanHorse.h"
 
 AEnemySpawner::AEnemySpawner()
 {
 	PrimaryActorTick.bCanEverTick = false;
 
-	BruteClass = AEnemyBrute::StaticClass();
+	BruteClass = AEnemyOgre::StaticClass();
 	TrojanClass = AEnemyTrojanHorse::StaticClass();
 
 	static ConstructorHelpers::FClassFinder<AEnemyBase> NormalEnemyBP(TEXT("/Game/Gameplay/Enemies/Blueprints/BP_EnemyBase"));
@@ -33,7 +33,7 @@ void AEnemySpawner::BeginPlay()
 	}
 	if (!BruteClass)
 	{
-		BruteClass = AEnemyBrute::StaticClass();
+		BruteClass = AEnemyOgre::StaticClass();
 	}
 	if (!TrojanClass)
 	{
@@ -127,7 +127,7 @@ TSubclassOf<AEnemyBase> AEnemySpawner::PickEnemyClass() const
 		{
 			return BruteClass;
 		}
-		return TSubclassOf<AEnemyBase>(AEnemyBrute::StaticClass());
+		return TSubclassOf<AEnemyBase>(AEnemyOgre::StaticClass());
 	}
 
 	if (TrojanClass)

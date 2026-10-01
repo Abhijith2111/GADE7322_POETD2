@@ -6,7 +6,7 @@
 #include "ProceduralTerrain.h"
 #include "EnemySpawner.generated.h"
 
-class AEnemyBrute;
+class AEnemyOgre;
 class AEnemyTrojanHorse;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnEnemySpawned, AEnemyBase*, SpawnedEnemy);
@@ -26,7 +26,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
 	TSubclassOf<AEnemyBase> EnemyClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner", meta = (DisplayName = "Ogre Class"))
 	TSubclassOf<AEnemyBase> BruteClass;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner")
@@ -35,7 +35,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))
 	int32 NormalWeight = 6;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0", DisplayName = "Ogre Weight"))
 	int32 BruteWeight = 2;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Spawner|Weights", meta = (ClampMin = "0"))

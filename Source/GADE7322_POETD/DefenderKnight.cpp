@@ -3,7 +3,7 @@
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "EnemyBase.h"
-#include "EnemyBrute.h"
+#include "EnemyOgre.h"
 #include "EnemyTrojanHorse.h"
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
@@ -14,7 +14,7 @@ ADefenderKnight::ADefenderKnight()
 	MaxHealth = 150.f;
 	AttackDamage = 30.f;
 	AttackRange = 100.f;
-	AttackInterval = 0.8f;
+	AttackInterval = 3.f;
 	SightRange = 1400.f;
 	MoveSpeed = 340.f;
 
@@ -88,7 +88,7 @@ AEnemyBase* ADefenderKnight::FindPriorityTarget() const
 		}
 
 		const float DistSq = FVector::DistSquared2D(GetActorLocation(), Enemy->GetActorLocation());
-		if (Cast<AEnemyBrute>(Enemy))
+		if (Cast<AEnemyOgre>(Enemy))
 		{
 			if (DistSq <= BruteDistSq)
 			{
