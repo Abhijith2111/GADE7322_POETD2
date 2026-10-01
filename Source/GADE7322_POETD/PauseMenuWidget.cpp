@@ -86,7 +86,7 @@ void UPauseMenuWidget::EnsureDefaultLayout()
 
 	AddMenuButton(ResumeButton, TEXT("ResumeButton"), TEXT("ResumeLabel"), NSLOCTEXT("UI", "Resume", "Resume"));
 	AddMenuButton(RestartButton, TEXT("RestartButton"), TEXT("RestartLabel"), NSLOCTEXT("UI", "Restart", "Restart"));
-	AddMenuButton(QuitToMenuButton, TEXT("QuitToMenuButton"), TEXT("QuitLabel"), NSLOCTEXT("UI", "Quit", "Quit"));
+	AddMenuButton(QuitToMenuButton, TEXT("QuitToMenuButton"), TEXT("QuitLabel"), NSLOCTEXT("UI", "MainMenu", "Main Menu"));
 
 	if (UOverlaySlot* MenuSlot = Overlay->AddChildToOverlay(Menu))
 	{
@@ -120,10 +120,15 @@ void UPauseMenuWidget::OnRestartClicked()
 
 void UPauseMenuWidget::OnQuitToMenuClicked()
 {
-	UGameplayStatics::SetGamePaused(GetWorld(), false);
-
-	if (!MainMenuLevel.IsNull())
+	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
 	{
-		UGameplayStatics::OpenLevelBySoftObjectPtr(this, MainMenuLevel);
+		PC->ReturnToMainMenu();
+		return;
+	}
+
+	UGameplayStatics::SetGamePaused(GetWorld(), false);
+	if (GetWorld())
+	{
+		UGameplayStatics::OpenLevel(this, FName(*UGameplayStatics::GetCurrentLevelName(GetWorld(), true)));
 	}
 }

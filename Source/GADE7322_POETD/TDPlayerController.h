@@ -60,6 +60,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
 	TSubclassOf<UUserWidget> GameOverClass;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "UI")
+	TSubclassOf<UUserWidget> MainMenuClass;
+
 	UPROPERTY(BlueprintAssignable, Category = "Placement")
 	FOnDefenderPlacementSucceeded OnDefenderPlacementSucceeded;
 
@@ -93,6 +96,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void RestartMatch();
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void StartMatchFromMenu();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ReturnToMainMenu();
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "400.0"))
 	float OverviewCameraHeight = 1400.f;
 
@@ -112,7 +121,11 @@ private:
 	UPROPERTY()
 	UUserWidget* GameOverInstance;
 
+	UPROPERTY()
+	UUserWidget* MainMenuInstance;
+
 	bool bIsPaused = false;
+	bool bInMainMenu = false;
 
 	void SetPausedState(bool bPause);
 
@@ -123,6 +136,8 @@ private:
 	void HandleGameVictory();
 
 	void ShowGameOver(bool bVictory);
+	void ShowMainMenu();
+	bool ShouldShowMainMenu() const;
 
 	TSet<int32> OccupiedGridIndices;
 	TMap<ADefenderBase*, int32> DefenderGridIndices;

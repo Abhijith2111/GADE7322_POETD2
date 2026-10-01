@@ -58,6 +58,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "GameState")
 	bool IsGameActive() const;
 
+	bool bSkipMainMenu = false;
+
 private:
 	UPROPERTY()
 	ACentralTowerBase* CentralTowerRef;

@@ -5,6 +5,7 @@
 #include "GameOverWidget.h"
 #include "TDHUDWidget.h"
 #include "PauseMenuWidget.h"
+#include "MainMenuWidget.h"
 #include "UObject/ConstructorHelpers.h"
 #include "TimerManager.h"
 #include "GameFramework/Pawn.h"
@@ -38,23 +39,29 @@ void ATDPlayerController::BeginPlay()
 	bEnableClickEvents = true;
 	bEnableMouseOverEvents = true;
 	bIsPaused = false;
-	if (UWorld* World = GetWorld())
-	{
-		if (AWorldSettings* Settings = World->GetWorldSettings())
-		{
-			Settings->SetPauserPlayerState(nullptr);
-		}
-		UGameplayStatics::SetGamePaused(World, false);
-	}
-	SetPause(false);
+	bInMainMenu = false;
 
-	FInputModeGameAndUI InputMode;
-	InputMode.SetHideCursorDuringCapture(false);
-	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
-	SetInputMode(InputMode);
-	if (APawn* ControlledPawn = GetPawn())
+	const bool bOpenOnMenu = ShouldShowMainMenu();
+	if (!bOpenOnMenu)
 	{
-		ControlledPawn->EnableInput(this);
+		if (UWorld* World = GetWorld())
+		{
+			if (AWorldSettings* Settings = World->GetWorldSettings())
+			{
+				Settings->SetPauserPlayerState(nullptr);
+			}
+			UGameplayStatics::SetGamePaused(World, false);
+		}
+		SetPause(false);
+
+		FInputModeGameAndUI InputMode;
+		InputMode.SetHideCursorDuringCapture(false);
+		InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		SetInputMode(InputMode);
+		if (APawn* ControlledPawn = GetPawn())
+		{
+			ControlledPawn->EnableInput(this);
+		}
 	}
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
@@ -70,6 +77,10 @@ void ATDPlayerController::BeginPlay()
 	if (!GameOverClass)
 	{
 		GameOverClass = UGameOverWidget::StaticClass();
+	}
+	if (!MainMenuClass)
+	{
+		MainMenuClass = UMainMenuWidget::StaticClass();
 	}
 
 	if (HUDClass)
@@ -88,7 +99,12 @@ void ATDPlayerController::BeginPlay()
 	}
 
 	OverviewCameraAttempts = 0;
-	GetWorldTimerManager().SetTimer(OverviewCameraHandle, this, &ATDPlayerController::PlaceOverviewCamera, 0.1f, false);
+	PlaceOverviewCamera();
+
+	if (bOpenOnMenu)
+	{
+		ShowMainMenu();
+	}
 }
 
 void ATDPlayerController::OnPossess(APawn* InPawn)
@@ -268,7 +284,126 @@ void ATDPlayerController::RestartMatch()
 	bShowMouseCursor = true;
 
 	const FString LevelName = UGameplayStatics::GetCurrentLevelName(World, true);
+	UGameplayStatics::OpenLevel(this, FName(*LevelName), true, TEXT("SkipMenu=1"));
+}
+
+void ATDPlayerController::StartMatchFromMenu()
+{
+	bInMainMenu = false;
+	if (MainMenuInstance)
+	{
+		MainMenuInstance->RemoveFromParent();
+		MainMenuInstance = nullptr;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		if (AWorldSettings* Settings = World->GetWorldSettings())
+		{
+			Settings->SetPauserPlayerState(nullptr);
+		}
+		UGameplayStatics::SetGamePaused(World, false);
+	}
+	SetPause(false);
+	bIsPaused = false;
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->EnableInput(this);
+	}
+	if (HUDInstance)
+	{
+		HUDInstance->SetVisibility(ESlateVisibility::Visible);
+	}
+
+	PlaceOverviewCamera();
+}
+
+void ATDPlayerController::ReturnToMainMenu()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (AWorldSettings* Settings = World->GetWorldSettings())
+	{
+		Settings->SetPauserPlayerState(nullptr);
+	}
+	UGameplayStatics::SetGamePaused(World, false);
+	SetPause(false);
+	bIsPaused = false;
+	bInMainMenu = false;
+
+	if (GameOverInstance)
+	{
+		GameOverInstance->RemoveFromParent();
+		GameOverInstance = nullptr;
+	}
+	if (PauseMenuInstance)
+	{
+		PauseMenuInstance->RemoveFromParent();
+		PauseMenuInstance = nullptr;
+	}
+	if (MainMenuInstance)
+	{
+		MainMenuInstance->RemoveFromParent();
+		MainMenuInstance = nullptr;
+	}
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetHideCursorDuringCapture(false);
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+
+	const FString LevelName = UGameplayStatics::GetCurrentLevelName(World, true);
 	UGameplayStatics::OpenLevel(this, FName(*LevelName));
+}
+
+void ATDPlayerController::ShowMainMenu()
+{
+	if (!MainMenuClass)
+	{
+		MainMenuClass = UMainMenuWidget::StaticClass();
+	}
+	if (!MainMenuInstance)
+	{
+		MainMenuInstance = CreateWidget<UUserWidget>(this, MainMenuClass);
+	}
+	if (MainMenuInstance && !MainMenuInstance->IsInViewport())
+	{
+		MainMenuInstance->AddToViewport(100);
+	}
+	if (HUDInstance)
+	{
+		HUDInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
+	bInMainMenu = true;
+	bIsPaused = true;
+	SetPause(true);
+
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	if (MainMenuInstance)
+	{
+		InputMode.SetWidgetToFocus(MainMenuInstance->TakeWidget());
+	}
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+}
+
+bool ATDPlayerController::ShouldShowMainMenu() const
+{
+	const ATDGameMode* GM = Cast<ATDGameMode>(UGameplayStatics::GetGameMode(this));
+	return !GM || !GM->bSkipMainMenu;
 }
 
 void ATDPlayerController::SetupInputComponent()
@@ -295,6 +430,11 @@ void ATDPlayerController::ResumeFromPause()
 
 void ATDPlayerController::SetPausedState(bool bPause)
 {
+	if (bInMainMenu)
+	{
+		return;
+	}
+
 	if (GameOverInstance && GameOverInstance->IsInViewport())
 	{
 		return;
