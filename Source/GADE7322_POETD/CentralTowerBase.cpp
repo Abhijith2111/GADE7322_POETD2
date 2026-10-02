@@ -6,7 +6,7 @@
 #include "Engine/StaticMesh.h"
 #include "Engine/World.h"
 #include "EnemyBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "TDGameState.h"
 
 ACentralTowerBase::ACentralTowerBase()
@@ -37,7 +37,7 @@ ACentralTowerBase::ACentralTowerBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 320.f), FVector2D(220.f, 28.f));
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 320.f), FVector2D(220.f, 28.f));
 }
 
 void ACentralTowerBase::SnapToGround()
@@ -72,7 +72,7 @@ void ACentralTowerBase::SnapToGround()
 	{
 		const FBox LocalBounds = TowerMesh->GetStaticMesh()->GetBoundingBox();
 		const float TopZ = LocalBounds.Max.Z * TowerMesh->GetComponentScale().Z;
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 40.f), FVector2D(220.f, 28.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, TopZ + 40.f), FVector2D(220.f, 28.f));
 	}
 }
 
@@ -91,7 +91,7 @@ void ACentralTowerBase::BeginPlay()
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, HealthBarWidget->GetRelativeLocation(), HealthBarWidget->GetDrawSize());
 
 	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
 	{

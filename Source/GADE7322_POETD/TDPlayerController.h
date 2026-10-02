@@ -9,6 +9,8 @@
 #include "TDGameInstance.h"
 #include "TDPlayerController.generated.h"
 
+class UButton;
+
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementFailed, FString, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnDefenderUpgraded, ADefenderBase*, UpgradedDefender, int32, NewLevel);
@@ -103,6 +105,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ReturnToMainMenu();
 
+	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ApplyDefenderButtonVisual(UButton* Button, TSubclassOf<ADefenderBase> InDefenderClass, int32 Cost);
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera", meta = (ClampMin = "400.0"))
 	float OverviewCameraHeight = 1400.f;
 
@@ -138,6 +143,7 @@ private:
 
 	void ShowGameOver(bool bVictory);
 	void ShowMainMenu();
+	void EnsureUIClasses();
 	bool ShouldShowMainMenu() const;
 
 	TSet<int32> OccupiedGridIndices;

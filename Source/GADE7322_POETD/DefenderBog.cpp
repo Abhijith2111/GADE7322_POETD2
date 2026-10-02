@@ -2,7 +2,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "EnemyBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "TimerManager.h"
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
@@ -65,7 +65,7 @@ void ADefenderBog::BeginPlay()
 			(LocalBounds.Min.X + LocalBounds.Max.X) * 0.5f,
 			(LocalBounds.Min.Y + LocalBounds.Max.Y) * 0.5f,
 			LocalBounds.Max.Z + (24.f / ScaleZ));
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, BarOffset, FVector2D(90.f, 12.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, BarOffset, FVector2D(160.f, 18.f));
 	}
 }
 

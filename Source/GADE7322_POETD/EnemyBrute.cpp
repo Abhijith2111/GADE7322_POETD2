@@ -5,7 +5,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "DefenderBase.h"
 #include "CentralTowerBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
 AEnemyBrute::AEnemyBrute()
@@ -31,7 +31,7 @@ AEnemyBrute::AEnemyBrute()
 
 	if (HealthBarWidget)
 	{
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 140.f), FVector2D(140.f, 18.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 140.f), FVector2D(140.f, 18.f));
 	}
 }
 

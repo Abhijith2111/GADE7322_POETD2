@@ -60,6 +60,10 @@ AProceduralTerrain::AProceduralTerrain()
 void AProceduralTerrain::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	if (bMatchPrepared)
+	{
+		return;
+	}
 	GenerateTerrain();
 }
 
@@ -372,11 +376,6 @@ FIntPoint AProceduralTerrain::GetRandomEdgeCell(int32 EdgeIndex) const
 
 void AProceduralTerrain::PrepareMatchBoard(int32 LaneCount)
 {
-	if (bMatchPrepared)
-	{
-		return;
-	}
-
 	const int32 TimeSeed = static_cast<int32>(FDateTime::UtcNow().GetTicks() & 0x7fffffff);
 	int32 NewSeed = TimeSeed == 0 ? 1 : TimeSeed;
 	if (NewSeed == Seed)
@@ -388,7 +387,7 @@ void AProceduralTerrain::PrepareMatchBoard(int32 LaneCount)
 	bUseMatchLaneCount = true;
 	bMatchPrepared = true;
 	GenerateTerrain();
-	bUseMatchLaneCount = false;
+	UE_LOG(LogTemp, Log, TEXT("ProceduralTerrain: New level has %d lanes."), NumPathways);
 }
 
 void AProceduralTerrain::GeneratePathways()

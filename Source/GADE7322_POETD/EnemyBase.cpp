@@ -9,7 +9,7 @@
 #include "TDGameInstance.h"
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -39,7 +39,7 @@ AEnemyBase::AEnemyBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 90.f), FVector2D(120.f, 16.f));
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 90.f), FVector2D(120.f, 16.f));
 }
 
 void AEnemyBase::BeginPlay()
@@ -55,7 +55,7 @@ void AEnemyBase::BeginPlay()
 	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, HealthBarWidget->GetRelativeLocation(), HealthBarWidget->GetDrawSize());
 	ApplyGruntCube();
 }
 

@@ -125,6 +125,9 @@ void AEnemySpawner::PrepareMatchBoard()
 	}
 
 	const int32 LaneCount = GetDifficulty() == ETDDifficulty::Hard ? FMath::RandRange(3, 5) : 3;
+	UE_LOG(LogTemp, Log, TEXT("EnemySpawner: Starting level on %s with %d lanes."),
+		GetDifficulty() == ETDDifficulty::Hard ? TEXT("Difficult") : TEXT("Easy/Medium"),
+		LaneCount);
 	TerrainRef->PrepareMatchBoard(LaneCount);
 }
 
