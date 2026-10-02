@@ -6,6 +6,7 @@
 #include "ProceduralTerrain.h"
 #include "TDGameState.h"
 #include "Blueprint/UserWidget.h"
+#include "TDGameInstance.h"
 #include "TDPlayerController.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
@@ -97,7 +98,7 @@ public:
 	void RestartMatch();
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
-	void StartMatchFromMenu();
+	void StartMatchFromMenu(ETDDifficulty Difficulty);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ReturnToMainMenu();

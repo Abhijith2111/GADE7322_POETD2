@@ -14,6 +14,8 @@
 #include "Camera/PlayerCameraManager.h"
 #include "CentralTowerBase.h"
 #include "DefenderBog.h"
+#include "DefenderMineShaft.h"
+#include "EnemySpawner.h"
 
 ATDPlayerController::ATDPlayerController()
 {
@@ -287,8 +289,13 @@ void ATDPlayerController::RestartMatch()
 	UGameplayStatics::OpenLevel(this, FName(*LevelName), true, TEXT("SkipMenu=1"));
 }
 
-void ATDPlayerController::StartMatchFromMenu()
+void ATDPlayerController::StartMatchFromMenu(ETDDifficulty Difficulty)
 {
+	if (UTDGameInstance* TDInstance = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		TDInstance->SetDifficulty(Difficulty);
+	}
+
 	bInMainMenu = false;
 	if (MainMenuInstance)
 	{
@@ -322,6 +329,16 @@ void ATDPlayerController::StartMatchFromMenu()
 	}
 
 	PlaceOverviewCamera();
+
+	TArray<AActor*> Spawners;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemySpawner::StaticClass(), Spawners);
+	for (AActor* Actor : Spawners)
+	{
+		if (AEnemySpawner* Spawner = Cast<AEnemySpawner>(Actor))
+		{
+			Spawner->StartSpawning();
+		}
+	}
 }
 
 void ATDPlayerController::ReturnToMainMenu()
@@ -666,6 +683,21 @@ void ATDPlayerController::TryPlaceDefender()
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("Bogs cannot be placed on the path."));
 		return;
+	}
+
+	if (DefenderClass->IsChildOf(ADefenderMineShaft::StaticClass()))
+	{
+		TArray<AActor*> ExistingMines;
+		UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderMineShaft::StaticClass(), ExistingMines);
+		for (AActor* Actor : ExistingMines)
+		{
+			const ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Actor);
+			if (Mine && !Mine->IsDestroyed())
+			{
+				OnDefenderPlacementFailed.Broadcast(TEXT("Only one mine shaft can be placed."));
+				return;
+			}
+		}
 	}
 
 	FActorSpawnParameters SpawnParams;

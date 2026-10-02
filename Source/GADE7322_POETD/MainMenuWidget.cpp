@@ -23,10 +23,25 @@ void UMainMenuWidget::NativeOnInitialized()
 	Super::NativeOnInitialized();
 	EnsureDefaultLayout();
 
-	if (PlayButton)
+	if (StartButton)
 	{
-		PlayButton->OnClicked.RemoveDynamic(this, &UMainMenuWidget::OnPlayClicked);
-		PlayButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnPlayClicked);
+		StartButton->OnClicked.RemoveDynamic(this, &UMainMenuWidget::OnStartClicked);
+		StartButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnStartClicked);
+	}
+	if (EasyButton)
+	{
+		EasyButton->OnClicked.RemoveDynamic(this, &UMainMenuWidget::OnEasyClicked);
+		EasyButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnEasyClicked);
+	}
+	if (MediumButton)
+	{
+		MediumButton->OnClicked.RemoveDynamic(this, &UMainMenuWidget::OnMediumClicked);
+		MediumButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnMediumClicked);
+	}
+	if (HardButton)
+	{
+		HardButton->OnClicked.RemoveDynamic(this, &UMainMenuWidget::OnHardClicked);
+		HardButton->OnClicked.AddDynamic(this, &UMainMenuWidget::OnHardClicked);
 	}
 	if (QuitButton)
 	{
@@ -44,7 +59,7 @@ void UMainMenuWidget::NativeConstruct()
 
 void UMainMenuWidget::EnsureDefaultLayout()
 {
-	if (PlayButton || !WidgetTree)
+	if (StartButton || !WidgetTree)
 	{
 		return;
 	}
@@ -62,7 +77,7 @@ void UMainMenuWidget::EnsureDefaultLayout()
 
 	UVerticalBox* Menu = WidgetTree->ConstructWidget<UVerticalBox>(UVerticalBox::StaticClass(), TEXT("MenuBox"));
 	UTextBlock* Title = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("Title"));
-	TDUIStyleText(Title, NSLOCTEXT("UI", "MainMenuTitle", "TOWER DEFENSE"), 48, FLinearColor::White, true);
+	TDUIStyleText(Title, NSLOCTEXT("UI", "MainMenuTitle", "Protect the Temple"), 48, FLinearColor::White, true);
 	Menu->AddChildToVerticalBox(Title);
 
 	auto AddMenuButton = [&](UButton*& OutButton, const FName ButtonName, const FName LabelName, const FText& Label)
@@ -79,8 +94,15 @@ void UMainMenuWidget::EnsureDefaultLayout()
 		}
 	};
 
-	AddMenuButton(PlayButton, TEXT("PlayButton"), TEXT("PlayLabel"), NSLOCTEXT("UI", "Play", "Play"));
+	AddMenuButton(StartButton, TEXT("StartButton"), TEXT("StartLabel"), NSLOCTEXT("UI", "StartGame", "Start Game"));
+	AddMenuButton(EasyButton, TEXT("EasyButton"), TEXT("EasyLabel"), NSLOCTEXT("UI", "Easy", "Easy"));
+	AddMenuButton(MediumButton, TEXT("MediumButton"), TEXT("MediumLabel"), NSLOCTEXT("UI", "Medium", "Medium"));
+	AddMenuButton(HardButton, TEXT("HardButton"), TEXT("HardLabel"), NSLOCTEXT("UI", "Hard", "Hard"));
 	AddMenuButton(QuitButton, TEXT("QuitButton"), TEXT("QuitLabel"), NSLOCTEXT("UI", "QuitGame", "Quit"));
+
+	SetChoiceVisible(EasyButton, false);
+	SetChoiceVisible(MediumButton, false);
+	SetChoiceVisible(HardButton, false);
 
 	if (UOverlaySlot* MenuSlot = Overlay->AddChildToOverlay(Menu))
 	{
@@ -89,12 +111,50 @@ void UMainMenuWidget::EnsureDefaultLayout()
 	}
 }
 
-void UMainMenuWidget::OnPlayClicked()
+void UMainMenuWidget::SetChoiceVisible(UButton* Button, bool bVisible)
+{
+	if (!Button)
+	{
+		return;
+	}
+
+	const ESlateVisibility ChoiceVisibility = bVisible ? ESlateVisibility::Visible : ESlateVisibility::Collapsed;
+	Button->SetVisibility(ChoiceVisibility);
+	if (UWidget* Parent = Button->GetParent())
+	{
+		Parent->SetVisibility(ChoiceVisibility);
+	}
+}
+
+void UMainMenuWidget::OnStartClicked()
+{
+	SetChoiceVisible(StartButton, false);
+	SetChoiceVisible(EasyButton, true);
+	SetChoiceVisible(MediumButton, true);
+	SetChoiceVisible(HardButton, true);
+}
+
+void UMainMenuWidget::StartAtDifficulty(ETDDifficulty Difficulty)
 {
 	if (ATDPlayerController* PC = Cast<ATDPlayerController>(GetOwningPlayer()))
 	{
-		PC->StartMatchFromMenu();
+		PC->StartMatchFromMenu(Difficulty);
 	}
+}
+
+void UMainMenuWidget::OnEasyClicked()
+{
+	StartAtDifficulty(ETDDifficulty::Easy);
+}
+
+void UMainMenuWidget::OnMediumClicked()
+{
+	StartAtDifficulty(ETDDifficulty::Medium);
+}
+
+void UMainMenuWidget::OnHardClicked()
+{
+	StartAtDifficulty(ETDDifficulty::Hard);
 }
 
 void UMainMenuWidget::OnQuitClicked()

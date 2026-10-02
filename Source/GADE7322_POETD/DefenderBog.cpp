@@ -1,7 +1,6 @@
 #include "DefenderBog.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "EnemyBase.h"
 #include "HealthBarWidget.h"
 #include "TimerManager.h"
@@ -18,10 +17,10 @@ ADefenderBog::ADefenderBog()
 
 	if (DefenderMesh)
 	{
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> ConeMesh(TEXT("/Engine/BasicShapes/Cone.Cone"));
-		if (ConeMesh.Succeeded())
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> SpireMesh(TEXT("/Game/Buildings/Spire.Spire"));
+		if (SpireMesh.Succeeded())
 		{
-			DefenderMesh->SetStaticMesh(ConeMesh.Object);
+			DefenderMesh->SetStaticMesh(SpireMesh.Object);
 		}
 	}
 }
@@ -33,9 +32,10 @@ void ADefenderBog::ApplyDefenderMesh()
 		return;
 	}
 
-	if (UStaticMesh* ConeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cone.Cone")))
+	if (UStaticMesh* SpireMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Spire.Spire")))
 	{
-		DefenderMesh->SetStaticMesh(ConeMesh);
+		DefenderMesh->SetStaticMesh(SpireMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
 	}
 
 	float TileSize = 200.f;
@@ -44,23 +44,12 @@ void ADefenderBog::ApplyDefenderMesh()
 		TileSize = FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y);
 	}
 
-	const FBox ConeBox = DefenderMesh->GetStaticMesh() ? DefenderMesh->GetStaticMesh()->GetBoundingBox() : FBox(FVector(-50.f), FVector(50.f));
-	const float MeshWidth = FMath::Max(ConeBox.GetSize().X, 1.f);
-	const float MeshHeight = FMath::Max(ConeBox.GetSize().Z, 1.f);
-	DefenderMesh->SetWorldScale3D(FVector(
-		(TileSize * 0.55f) / MeshWidth,
-		(TileSize * 0.55f) / MeshWidth,
-		(TileSize * 0.85f) / MeshHeight));
-
-	if (UMaterialInterface* BaseMat = DefenderMesh->GetMaterial(0))
+	if (UStaticMesh* SpireAsset = DefenderMesh->GetStaticMesh())
 	{
-		if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
-		{
-			const FLinearColor Purple(0.45f, 0.12f, 0.72f);
-			DynMat->SetVectorParameterValue(TEXT("Color"), Purple);
-			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Purple);
-			DefenderMesh->SetMaterial(0, DynMat);
-		}
+		const FBox MeshBox = SpireAsset->GetBoundingBox();
+		const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
+		const float Uniform = (TileSize * 0.7f) / MeshWidth;
+		DefenderMesh->SetWorldScale3D(FVector(Uniform));
 	}
 }
 

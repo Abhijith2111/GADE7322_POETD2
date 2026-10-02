@@ -5,6 +5,8 @@
 #include "TimerManager.h"
 #include "DefenderBase.h"
 #include "DefenderKnight.h"
+#include "DefenderMineShaft.h"
+#include "TDGameInstance.h"
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
 #include "HealthBarWidget.h"
@@ -335,8 +337,13 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 
 	ADefenderBase* Nearest = nullptr;
 	ADefenderKnight* NearestKnight = nullptr;
+	ADefenderMineShaft* NearestMine = nullptr;
 	float NearestDistSq = FMath::Square(Range);
 	float NearestKnightDistSq = NearestDistSq;
+	float NearestMineDistSq = NearestDistSq;
+
+	const UTDGameInstance* TDInstance = Cast<UTDGameInstance>(GetGameInstance());
+	const bool bHuntMine = TDInstance && TDInstance->GetDifficulty() == ETDDifficulty::Hard;
 
 	for (AActor* Actor : Defenders)
 	{
@@ -349,9 +356,22 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 		const FVector SelfLoc = FVector(GetActorLocation().X, GetActorLocation().Y, 0.f);
 		const FVector DefLoc = FVector(Defender->GetActorLocation().X, Defender->GetActorLocation().Y, 0.f);
 		const float DistSq = FVector::DistSquared(SelfLoc, DefLoc);
-		if (DistSq > NearestDistSq && DistSq > NearestKnightDistSq)
+		if (DistSq > NearestDistSq && DistSq > NearestKnightDistSq && DistSq > NearestMineDistSq)
 		{
 			continue;
+		}
+
+		if (bHuntMine)
+		{
+			if (ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Defender))
+			{
+				if (DistSq <= NearestMineDistSq)
+				{
+					NearestMineDistSq = DistSq;
+					NearestMine = Mine;
+				}
+				continue;
+			}
 		}
 
 		if (ADefenderKnight* Knight = Cast<ADefenderKnight>(Defender))
@@ -367,6 +387,11 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 			NearestDistSq = DistSq;
 			Nearest = Defender;
 		}
+	}
+
+	if (bHuntMine && NearestMine)
+	{
+		return NearestMine;
 	}
 
 	if (ShouldEngageDefenders() && NearestKnight)
