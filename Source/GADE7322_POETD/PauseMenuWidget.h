@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Widgets/SWidget.h"
 #include "PauseMenuWidget.generated.h"
 
 UCLASS()
@@ -11,21 +10,19 @@ class GADE7322_POETD_API UPauseMenuWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UButton* ResumeButton;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UButton* RestartButton;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UButton* QuitToMenuButton;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Levels")
 	TSoftObjectPtr<UWorld> MainMenuLevel;
 
 protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 
 	UFUNCTION()
@@ -36,6 +33,4 @@ protected:
 
 	UFUNCTION()
 	void OnQuitToMenuClicked();
-
-	void EnsureDefaultLayout();
 };

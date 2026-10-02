@@ -128,6 +128,7 @@ private:
 	bool bInMainMenu = false;
 
 	void SetPausedState(bool bPause);
+	void EnsureWidgetClasses();
 
 	UFUNCTION()
 	void HandleGameLoss();

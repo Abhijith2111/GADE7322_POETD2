@@ -1,10 +1,22 @@
 #include "HealthBarWidget.h"
 #include "Components/ProgressBar.h"
-#include "Components/SizeBox.h"
 #include "Components/WidgetComponent.h"
-#include "Blueprint/WidgetTree.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
+
+namespace
+{
+	TSubclassOf<UHealthBarWidget> ResolveHealthBarClass()
+	{
+		if (UClass* Loaded = LoadClass<UHealthBarWidget>(nullptr, TEXT("/Game/UI/WBP_HealthBar.WBP_HealthBar_C")))
+		{
+			return Loaded;
+		}
+
+		UE_LOG(LogTemp, Error, TEXT("HealthBarWidget: /Game/UI/WBP_HealthBar was not found."));
+		return UHealthBarWidget::StaticClass();
+	}
+}
 
 void UHealthBarWidget::InitializeWithOwner(AActor* InOwner)
 {
@@ -49,7 +61,7 @@ void UHealthBarWidget::ConfigureComponent(UWidgetComponent* Comp, const FVector&
 	Comp->SetVisibility(true);
 	Comp->SetTickWhenOffscreen(true);
 	Comp->SetBlendMode(EWidgetBlendMode::Transparent);
-	Comp->SetWidgetClass(StaticClass());
+	Comp->SetWidgetClass(ResolveHealthBarClass());
 }
 
 void UHealthBarWidget::OrientComponentTowardCamera(UWidgetComponent* Comp)
@@ -90,7 +102,7 @@ void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Own
 	Comp->SetVisibility(true);
 	Comp->SetDrawAtDesiredSize(false);
 	Comp->SetWidgetSpace(EWidgetSpace::World);
-	Comp->SetWidgetClass(StaticClass());
+	Comp->SetWidgetClass(ResolveHealthBarClass());
 	Comp->InitWidget();
 	Comp->RequestRedraw();
 
@@ -103,47 +115,11 @@ void UHealthBarWidget::BindToWidgetComponent(UWidgetComponent* Comp, AActor* Own
 	OrientComponentTowardCamera(Comp);
 }
 
-TSharedRef<SWidget> UHealthBarWidget::RebuildWidget()
-{
-	EnsureDefaultLayout();
-	return Super::RebuildWidget();
-}
-
-void UHealthBarWidget::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-	EnsureDefaultLayout();
-}
-
 void UHealthBarWidget::NativeConstruct()
 {
-	EnsureDefaultLayout();
 	Super::NativeConstruct();
 	TryAutoBindOwner();
 	SetVisibility(ESlateVisibility::HitTestInvisible);
-}
-
-void UHealthBarWidget::EnsureDefaultLayout()
-{
-	if (HealthProgressBar || !WidgetTree)
-	{
-		return;
-	}
-
-	USizeBox* SizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("HealthSizeBox"));
-	SizeBox->SetWidthOverride(120.f);
-	SizeBox->SetHeightOverride(16.f);
-
-	HealthProgressBar = WidgetTree->ConstructWidget<UProgressBar>(UProgressBar::StaticClass(), TEXT("HealthProgressBar"));
-	HealthProgressBar->SetPercent(1.f);
-	HealthProgressBar->SetFillColorAndOpacity(HealthyFillColor);
-
-	SizeBox->AddChild(HealthProgressBar);
-
-	if (!WidgetTree->RootWidget)
-	{
-		WidgetTree->RootWidget = SizeBox;
-	}
 }
 
 void UHealthBarWidget::TryAutoBindOwner()
@@ -213,11 +189,6 @@ void UHealthBarWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime
 
 	UpdateDamageFlash(InDeltaTime);
 	FaceOwnerBarTowardCamera();
-
-	if (!HealthProgressBar)
-	{
-		EnsureDefaultLayout();
-	}
 
 	AActor* Owner = OwningActor.Get();
 	if (!IsValid(Owner))

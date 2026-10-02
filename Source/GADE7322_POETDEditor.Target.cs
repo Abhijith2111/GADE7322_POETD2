@@ -9,5 +9,6 @@ public class GADE7322_POETDEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V7;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_8;
 		ExtraModuleNames.Add("GADE7322_POETD");
+		ExtraModuleNames.Add("GADE7322_POETDEditor");
 	}
 }

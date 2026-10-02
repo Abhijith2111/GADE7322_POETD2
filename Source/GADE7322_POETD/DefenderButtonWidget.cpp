@@ -1,10 +1,7 @@
 #include "DefenderButtonWidget.h"
 #include "Components/Button.h"
 #include "Components/TextBlock.h"
-#include "Components/SizeBox.h"
-#include "Blueprint/WidgetTree.h"
 #include "TDPlayerController.h"
-#include "UILayoutHelpers.h"
 #include "UObject/ConstructorHelpers.h"
 
 UDefenderButtonWidget::UDefenderButtonWidget(const FObjectInitializer& ObjectInitializer)
@@ -20,60 +17,32 @@ UDefenderButtonWidget::UDefenderButtonWidget(const FObjectInitializer& ObjectIni
 	}
 }
 
-TSharedRef<SWidget> UDefenderButtonWidget::RebuildWidget()
-{
-	EnsureDefaultLayout();
-	return Super::RebuildWidget();
-}
-
-void UDefenderButtonWidget::NativeOnInitialized()
-{
-	Super::NativeOnInitialized();
-	EnsureDefaultLayout();
-}
-
 void UDefenderButtonWidget::NativeConstruct()
 {
-	EnsureDefaultLayout();
 	Super::NativeConstruct();
 
-	if (CostText)
-	{
-		const FText Label = ButtonLabel.IsEmpty()
-			? NSLOCTEXT("UI", "Defender", "Defender")
-			: ButtonLabel;
-		CostText->SetText(FText::Format(
-			NSLOCTEXT("UI", "CostFormatNamed", "{0}\n{1} coins"),
-			Label,
-			FText::AsNumber(Cost)));
-	}
+	UpdateDisplayedCost();
 	if (PurchaseButton)
 	{
+		PurchaseButton->OnClicked.RemoveDynamic(this, &UDefenderButtonWidget::OnPurchaseClicked);
 		PurchaseButton->OnClicked.AddDynamic(this, &UDefenderButtonWidget::OnPurchaseClicked);
 	}
 }
 
-void UDefenderButtonWidget::EnsureDefaultLayout()
+void UDefenderButtonWidget::UpdateDisplayedCost()
 {
-	if (PurchaseButton || !WidgetTree)
+	if (!CostText)
 	{
 		return;
 	}
 
-	USizeBox* SizeBox = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("PurchaseSizeBox"));
-	SizeBox->SetWidthOverride(180.f);
-	SizeBox->SetHeightOverride(56.f);
-
-	PurchaseButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("PurchaseButton"));
-	CostText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("CostText"));
-	TDUIStyleText(CostText, NSLOCTEXT("UI", "CostPlaceholder", "100 coins"), 20, FLinearColor::White, true);
-	PurchaseButton->AddChild(CostText);
-	SizeBox->AddChild(PurchaseButton);
-
-	if (!WidgetTree->RootWidget)
-	{
-		WidgetTree->RootWidget = SizeBox;
-	}
+	const FText Label = ButtonLabel.IsEmpty()
+		? NSLOCTEXT("UI", "Defender", "Defender")
+		: ButtonLabel;
+	CostText->SetText(FText::Format(
+		NSLOCTEXT("UI", "CostFormatNamed", "{0}\n{1} coins"),
+		Label,
+		FText::AsNumber(Cost)));
 }
 
 void UDefenderButtonWidget::RefreshAffordability(int32 CurrentGold)

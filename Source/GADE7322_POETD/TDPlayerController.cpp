@@ -21,9 +21,29 @@ ATDPlayerController::ATDPlayerController()
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
 
-	HUDClass = UTDHUDWidget::StaticClass();
-	PauseMenuClass = UPauseMenuWidget::StaticClass();
-	GameOverClass = UGameOverWidget::StaticClass();
+	static ConstructorHelpers::FClassFinder<UUserWidget> HUDBP(TEXT("/Game/UI/WBP_TDHUD"));
+	if (HUDBP.Succeeded())
+	{
+		HUDClass = HUDBP.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> PauseBP(TEXT("/Game/UI/WBP_PauseMenu"));
+	if (PauseBP.Succeeded())
+	{
+		PauseMenuClass = PauseBP.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> GameOverBP(TEXT("/Game/UI/WBP_GameOver"));
+	if (GameOverBP.Succeeded())
+	{
+		GameOverClass = GameOverBP.Class;
+	}
+
+	static ConstructorHelpers::FClassFinder<UUserWidget> MainMenuBP(TEXT("/Game/UI/WBP_MainMenu"));
+	if (MainMenuBP.Succeeded())
+	{
+		MainMenuClass = MainMenuBP.Class;
+	}
 
 	static ConstructorHelpers::FClassFinder<ADefenderBase> DefenderBP(TEXT("/Game/Gameplay/LevelObjects/BP_DefenderBase"));
 	if (DefenderBP.Succeeded())
@@ -67,22 +87,7 @@ void ATDPlayerController::BeginPlay()
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
-	if (!HUDClass)
-	{
-		HUDClass = UTDHUDWidget::StaticClass();
-	}
-	if (!PauseMenuClass)
-	{
-		PauseMenuClass = UPauseMenuWidget::StaticClass();
-	}
-	if (!GameOverClass)
-	{
-		GameOverClass = UGameOverWidget::StaticClass();
-	}
-	if (!MainMenuClass)
-	{
-		MainMenuClass = UMainMenuWidget::StaticClass();
-	}
+	EnsureWidgetClasses();
 
 	if (HUDClass)
 	{
@@ -368,12 +373,36 @@ void ATDPlayerController::ReturnToMainMenu()
 	UGameplayStatics::OpenLevel(this, FName(*LevelName));
 }
 
+void ATDPlayerController::EnsureWidgetClasses()
+{
+	auto Resolve = [](TSubclassOf<UUserWidget>& Slot, const TCHAR* Path, UClass* NativeClass)
+	{
+		if (Slot && Slot != NativeClass)
+		{
+			return;
+		}
+
+		if (UClass* Loaded = LoadClass<UUserWidget>(nullptr, Path))
+		{
+			Slot = Loaded;
+			return;
+		}
+
+		if (!Slot)
+		{
+			Slot = NativeClass;
+		}
+	};
+
+	Resolve(HUDClass, TEXT("/Game/UI/WBP_TDHUD.WBP_TDHUD_C"), UTDHUDWidget::StaticClass());
+	Resolve(PauseMenuClass, TEXT("/Game/UI/WBP_PauseMenu.WBP_PauseMenu_C"), UPauseMenuWidget::StaticClass());
+	Resolve(GameOverClass, TEXT("/Game/UI/WBP_GameOver.WBP_GameOver_C"), UGameOverWidget::StaticClass());
+	Resolve(MainMenuClass, TEXT("/Game/UI/WBP_MainMenu.WBP_MainMenu_C"), UMainMenuWidget::StaticClass());
+}
+
 void ATDPlayerController::ShowMainMenu()
 {
-	if (!MainMenuClass)
-	{
-		MainMenuClass = UMainMenuWidget::StaticClass();
-	}
+	EnsureWidgetClasses();
 	if (!MainMenuInstance)
 	{
 		MainMenuInstance = CreateWidget<UUserWidget>(this, MainMenuClass);
@@ -446,6 +475,7 @@ void ATDPlayerController::SetPausedState(bool bPause)
 
 	if (bIsPaused)
 	{
+		EnsureWidgetClasses();
 		if (!PauseMenuInstance && PauseMenuClass)
 		{
 			PauseMenuInstance = CreateWidget<UUserWidget>(this, PauseMenuClass);
@@ -516,10 +546,7 @@ void ATDPlayerController::ShowGameOver(bool bVictory)
 	SetPause(true);
 	bIsPaused = true;
 
-	if (!GameOverClass)
-	{
-		GameOverClass = UGameOverWidget::StaticClass();
-	}
+	EnsureWidgetClasses();
 
 	if (!GameOverInstance && GameOverClass)
 	{

@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Widgets/SWidget.h"
 #include "HealthDisplayInterface.h"
 #include "HealthBarWidget.generated.h"
 
@@ -24,12 +23,10 @@ public:
 
 	static void OrientComponentTowardCamera(UWidgetComponent* Comp);
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UProgressBar* HealthProgressBar;
 
 protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 	virtual void NativeTick(const FGeometry& MyGeometry, float InDeltaTime) override;
 
@@ -37,7 +34,6 @@ protected:
 	void PlayDamageFlash();
 	virtual void PlayDamageFlash_Implementation();
 
-	void EnsureDefaultLayout();
 	void TryAutoBindOwner();
 	void UpdateDamageFlash(float InDeltaTime);
 	void FaceOwnerBarTowardCamera();

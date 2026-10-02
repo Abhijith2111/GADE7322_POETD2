@@ -2,7 +2,6 @@
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
-#include "Widgets/SWidget.h"
 #include "DefenderBase.h"
 #include "DefenderButtonWidget.generated.h"
 
@@ -23,22 +22,20 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Defender")
 	FText ButtonLabel;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UButton* PurchaseButton;
 
-	UPROPERTY(meta = (BindWidgetOptional))
+	UPROPERTY(meta = (BindWidget))
 	class UTextBlock* CostText;
 
 	UFUNCTION(BlueprintCallable, Category = "Defender")
 	void RefreshAffordability(int32 CurrentGold);
 
+	void UpdateDisplayedCost();
+
 protected:
-	virtual TSharedRef<SWidget> RebuildWidget() override;
-	virtual void NativeOnInitialized() override;
 	virtual void NativeConstruct() override;
 
 	UFUNCTION()
 	void OnPurchaseClicked();
-
-	void EnsureDefaultLayout();
 };
