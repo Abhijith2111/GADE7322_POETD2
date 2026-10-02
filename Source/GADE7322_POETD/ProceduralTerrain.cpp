@@ -412,7 +412,8 @@ void AProceduralTerrain::GeneratePathways()
 	{
 		while (Edges.Num() < LaneCount)
 		{
-			Edges.Add(Edges[RandomStream.RandRange(0, 3)]);
+			const int32 ReusedEdge = Edges[RandomStream.RandRange(0, 3)];
+			Edges.Add(ReusedEdge);
 		}
 	}
 

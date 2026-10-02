@@ -11,6 +11,11 @@
 #include "TDGameState.h"
 #include "HealthBarWidget.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "EnemyBrute.h"
+#include "EnemyTrojanHorse.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -51,6 +56,7 @@ void AEnemyBase::BeginPlay()
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+	ApplyGruntCube();
 }
 
 void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -62,6 +68,46 @@ void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AEnemyBase::ApplyGruntCube()
+{
+	if (IsA(AEnemyBrute::StaticClass()) || IsA(AEnemyTrojanHorse::StaticClass()))
+	{
+		return;
+	}
+
+	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!CubeMesh)
+	{
+		return;
+	}
+
+	if (USkeletalMeshComponent* CharMesh = GetMesh())
+	{
+		CharMesh->SetHiddenInGame(true);
+		CharMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	TArray<UStaticMeshComponent*> MeshComponents;
+	GetComponents<UStaticMeshComponent>(MeshComponents);
+	if (MeshComponents.Num() == 0)
+	{
+		UStaticMeshComponent* BodyMesh = NewObject<UStaticMeshComponent>(this, TEXT("BodyMesh"));
+		BodyMesh->SetupAttachment(GetRootComponent());
+		BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		BodyMesh->SetRelativeScale3D(FVector(0.7f));
+		BodyMesh->RegisterComponent();
+		MeshComponents.Add(BodyMesh);
+	}
+
+	for (UStaticMeshComponent* MeshComp : MeshComponents)
+	{
+		if (MeshComp)
+		{
+			MeshComp->SetStaticMesh(CubeMesh);
+		}
+	}
 }
 
 void AEnemyBase::PlayHitFlash()

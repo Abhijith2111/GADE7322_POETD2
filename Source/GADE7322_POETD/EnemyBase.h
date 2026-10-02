@@ -105,6 +105,7 @@ protected:
 	UFUNCTION()
 	void RestoreHitFlash();
 
+	void ApplyGruntCube();
 	virtual bool ShouldEngageDefenders() const;
 	virtual bool ShouldBypassFights() const;
 	void AllowPassThroughFights();
