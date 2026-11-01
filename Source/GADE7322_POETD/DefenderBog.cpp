@@ -9,7 +9,7 @@
 
 ADefenderBog::ADefenderBog()
 {
-	MaxHealth = 300.f;
+	MaxHealth = 250.f;
 	AttackRange = 220.f;
 	AttackDamage = 0.f;
 	AttackInterval = 0.25f;

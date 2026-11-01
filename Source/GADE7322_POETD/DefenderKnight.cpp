@@ -14,7 +14,7 @@ ADefenderKnight::ADefenderKnight()
 	MaxHealth = 150.f;
 	AttackDamage = 30.f;
 	AttackRange = 100.f;
-	AttackInterval = 0.8f;
+	AttackInterval = 1.5f;
 	SightRange = 1400.f;
 	MoveSpeed = 340.f;
 

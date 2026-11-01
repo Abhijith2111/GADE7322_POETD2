@@ -10,7 +10,7 @@
 
 AEnemyTrojanHorse::AEnemyTrojanHorse()
 {
-	MaxHealth = 120.f;
+	MaxHealth = 180.f;
 	AttackDamage = 0.f;
 	MoveSpeed = 220.f;
 	AttackRange = 140.f;

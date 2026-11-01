@@ -10,7 +10,7 @@
 
 AEnemyBrute::AEnemyBrute()
 {
-	MaxHealth = 200.f;
+	MaxHealth = 250.f;
 	AttackDamage = 32.f;
 	MoveSpeed = 260.f;
 	AttackRange = 160.f;
