@@ -7,7 +7,7 @@
 #include "Engine/World.h"
 #include "EnemyBase.h"
 #include "CentralTowerBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 
 ADefenderBase::ADefenderBase()
 {
@@ -37,7 +37,7 @@ ADefenderBase::ADefenderBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 100.f), FVector2D(56.f, 8.f));
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 100.f), FVector2D(140.f, 18.f));
 }
 
 void ADefenderBase::SeatMeshOnPivot()
@@ -132,13 +132,13 @@ void ADefenderBase::BeginPlay()
 			(LocalBounds.Min.X + LocalBounds.Max.X) * 0.5f,
 			(LocalBounds.Min.Y + LocalBounds.Max.Y) * 0.5f,
 			LocalBounds.Max.Z + (24.f / ScaleZ));
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, BarOffset, FVector2D(72.f, 10.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, BarOffset, FVector2D(140.f, 18.f));
 	}
 
 	CurrentHealth = MaxHealth;
 	bIsDestroyed = false;
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, HealthBarWidget->GetRelativeLocation(), HealthBarWidget->GetDrawSize());
 
 	const float InitialDelay = FMath::FRandRange(0.f, AttackInterval);
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ADefenderBase::ScanAndAttack, AttackInterval, true, InitialDelay);

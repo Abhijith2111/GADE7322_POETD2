@@ -60,6 +60,10 @@ AProceduralTerrain::AProceduralTerrain()
 void AProceduralTerrain::OnConstruction(const FTransform& Transform)
 {
 	Super::OnConstruction(Transform);
+	if (bMatchPrepared)
+	{
+		return;
+	}
 	GenerateTerrain();
 }
 
@@ -67,12 +71,15 @@ void AProceduralTerrain::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (bRandomizeSeedOnPlay)
+	if (bRandomizeSeedOnPlay && !bMatchPrepared)
 	{
 		Seed = FMath::Rand();
 	}
 
-	GenerateTerrain();
+	if (!bMatchPrepared)
+	{
+		GenerateTerrain();
+	}
 
 	if (CentralTowerClass)
 	{
@@ -118,7 +125,7 @@ void AProceduralTerrain::GenerateTerrain()
 {
 	GridWidth = FMath::Max(GridWidth, 4);
 	GridHeight = FMath::Max(GridHeight, 4);
-	NumPathways = 3;
+	NumPathways = bUseMatchLaneCount ? FMath::Clamp(MatchLaneCount, 3, 5) : 3;
 
 	if (bAutoDetectTileDimensions)
 	{
@@ -367,16 +374,46 @@ FIntPoint AProceduralTerrain::GetRandomEdgeCell(int32 EdgeIndex) const
 	}
 }
 
+void AProceduralTerrain::PrepareMatchBoard(int32 LaneCount)
+{
+	const int32 TimeSeed = static_cast<int32>(FDateTime::UtcNow().GetTicks() & 0x7fffffff);
+	int32 NewSeed = TimeSeed == 0 ? 1 : TimeSeed;
+	if (NewSeed == Seed)
+	{
+		NewSeed += 1;
+	}
+	Seed = NewSeed;
+	MatchLaneCount = FMath::Clamp(LaneCount, 3, 5);
+	bUseMatchLaneCount = true;
+	bMatchPrepared = true;
+	GenerateTerrain();
+	UE_LOG(LogTemp, Log, TEXT("ProceduralTerrain: New level has %d lanes."), NumPathways);
+}
+
 void AProceduralTerrain::GeneratePathways()
 {
 	const FIntPoint CenterCell(GridWidth / 2, GridHeight / 2);
-	NumPathways = 3;
 
-	TArray<int32> EdgeOrder = { 0, 1, 2, 3 };
-	for (int32 i = EdgeOrder.Num() - 1; i > 0; --i)
+	TArray<int32> Edges = { 0, 1, 2, 3 };
+	for (int32 i = Edges.Num() - 1; i > 0; --i)
 	{
 		const int32 j = RandomStream.RandRange(0, i);
-		EdgeOrder.Swap(i, j);
+		Edges.Swap(i, j);
+	}
+
+	const int32 LaneCount = FMath::Clamp(NumPathways, 3, 5);
+	NumPathways = LaneCount;
+	if (LaneCount <= Edges.Num())
+	{
+		Edges.SetNum(LaneCount);
+	}
+	else
+	{
+		while (Edges.Num() < LaneCount)
+		{
+			const int32 ReusedEdge = Edges[RandomStream.RandRange(0, 3)];
+			Edges.Add(ReusedEdge);
+		}
 	}
 
 	TSet<int32> UsedColumns;
@@ -413,7 +450,7 @@ void AProceduralTerrain::GeneratePathways()
 
 	for (int32 PathIndex = 0; PathIndex < NumPathways; ++PathIndex)
 	{
-		const int32 Edge = EdgeOrder[PathIndex];
+		const int32 Edge = Edges[PathIndex];
 		const bool bHorizontalEdge = (Edge == 0 || Edge == 1);
 		const bool bMoveXFirst = !bHorizontalEdge;
 

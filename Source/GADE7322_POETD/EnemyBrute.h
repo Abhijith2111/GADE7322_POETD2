@@ -3,15 +3,15 @@
 #include "CoreMinimal.h"
 #include "EnemyBase.h"
 #include "Components/StaticMeshComponent.h"
-#include "EnemyOgre.generated.h"
+#include "EnemyBrute.generated.h"
 
 UCLASS()
-class GADE7322_POETD_API AEnemyOgre : public AEnemyBase
+class GADE7322_POETD_API AEnemyBrute : public AEnemyBase
 {
 	GENERATED_BODY()
 
 public:
-	AEnemyOgre();
+	AEnemyBrute();
 
 protected:
 	virtual void BeginPlay() override;
@@ -20,7 +20,7 @@ protected:
 	virtual void UpdateMovementAndCombat(float DeltaTime) override;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
-	UStaticMeshComponent* OgreMesh;
+	UStaticMeshComponent* BruteMesh;
 
 private:
 	TSet<TWeakObjectPtr<ADefenderBase>> DamagedDefenders;

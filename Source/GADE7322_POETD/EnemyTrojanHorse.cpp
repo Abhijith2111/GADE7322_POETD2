@@ -4,7 +4,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Engine/StaticMesh.h"
 #include "CentralTowerBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "TDGameState.h"
 #include "GameFramework/CharacterMovementComponent.h"
 
@@ -40,7 +40,7 @@ AEnemyTrojanHorse::AEnemyTrojanHorse()
 
 	if (HealthBarWidget)
 	{
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 160.f), FVector2D(160.f, 20.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 160.f), FVector2D(160.f, 20.f));
 	}
 }
 
@@ -84,7 +84,7 @@ void AEnemyTrojanHorse::BeginPlay()
 			if (HealthBarWidget)
 			{
 				const float TopZ = -CapsuleHalf + MeshBox.Max.Z * Scale;
-				UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, TopZ + 24.f), FVector2D(160.f, 20.f));
+				UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, TopZ + 24.f), FVector2D(160.f, 20.f));
 			}
 		}
 	}

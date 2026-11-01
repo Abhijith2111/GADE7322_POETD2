@@ -5,10 +5,17 @@
 #include "TimerManager.h"
 #include "DefenderBase.h"
 #include "DefenderKnight.h"
+#include "DefenderMineShaft.h"
+#include "TDGameInstance.h"
 #include "CentralTowerBase.h"
 #include "TDGameState.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/StaticMesh.h"
+#include "EnemyBrute.h"
+#include "EnemyTrojanHorse.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -32,7 +39,7 @@ AEnemyBase::AEnemyBase()
 
 	HealthBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("HealthBarWidget"));
 	HealthBarWidget->SetupAttachment(RootComponent);
-	UHealthBarWidget::ConfigureComponent(HealthBarWidget, FVector(0.f, 0.f, 90.f), FVector2D(120.f, 16.f));
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, 90.f), FVector2D(120.f, 16.f));
 }
 
 void AEnemyBase::BeginPlay()
@@ -48,7 +55,8 @@ void AEnemyBase::BeginPlay()
 	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
-	UHealthBarWidget::BindToWidgetComponent(HealthBarWidget, this);
+	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, HealthBarWidget->GetRelativeLocation(), HealthBarWidget->GetDrawSize());
+	ApplyGruntCube();
 }
 
 void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -60,6 +68,46 @@ void AEnemyBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
 	}
 	Super::EndPlay(EndPlayReason);
+}
+
+void AEnemyBase::ApplyGruntCube()
+{
+	if (IsA(AEnemyBrute::StaticClass()) || IsA(AEnemyTrojanHorse::StaticClass()))
+	{
+		return;
+	}
+
+	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	if (!CubeMesh)
+	{
+		return;
+	}
+
+	if (USkeletalMeshComponent* CharMesh = GetMesh())
+	{
+		CharMesh->SetHiddenInGame(true);
+		CharMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	TArray<UStaticMeshComponent*> MeshComponents;
+	GetComponents<UStaticMeshComponent>(MeshComponents);
+	if (MeshComponents.Num() == 0)
+	{
+		UStaticMeshComponent* BodyMesh = NewObject<UStaticMeshComponent>(this, TEXT("BodyMesh"));
+		BodyMesh->SetupAttachment(GetRootComponent());
+		BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		BodyMesh->SetRelativeScale3D(FVector(0.7f));
+		BodyMesh->RegisterComponent();
+		MeshComponents.Add(BodyMesh);
+	}
+
+	for (UStaticMeshComponent* MeshComp : MeshComponents)
+	{
+		if (MeshComp)
+		{
+			MeshComp->SetStaticMesh(CubeMesh);
+		}
+	}
 }
 
 void AEnemyBase::PlayHitFlash()
@@ -335,8 +383,13 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 
 	ADefenderBase* Nearest = nullptr;
 	ADefenderKnight* NearestKnight = nullptr;
+	ADefenderMineShaft* NearestMine = nullptr;
 	float NearestDistSq = FMath::Square(Range);
 	float NearestKnightDistSq = NearestDistSq;
+	float NearestMineDistSq = NearestDistSq;
+
+	const UTDGameInstance* TDInstance = Cast<UTDGameInstance>(GetGameInstance());
+	const bool bHuntMine = TDInstance && TDInstance->GetDifficulty() == ETDDifficulty::Hard;
 
 	for (AActor* Actor : Defenders)
 	{
@@ -349,9 +402,22 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 		const FVector SelfLoc = FVector(GetActorLocation().X, GetActorLocation().Y, 0.f);
 		const FVector DefLoc = FVector(Defender->GetActorLocation().X, Defender->GetActorLocation().Y, 0.f);
 		const float DistSq = FVector::DistSquared(SelfLoc, DefLoc);
-		if (DistSq > NearestDistSq && DistSq > NearestKnightDistSq)
+		if (DistSq > NearestDistSq && DistSq > NearestKnightDistSq && DistSq > NearestMineDistSq)
 		{
 			continue;
+		}
+
+		if (bHuntMine)
+		{
+			if (ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Defender))
+			{
+				if (DistSq <= NearestMineDistSq)
+				{
+					NearestMineDistSq = DistSq;
+					NearestMine = Mine;
+				}
+				continue;
+			}
 		}
 
 		if (ADefenderKnight* Knight = Cast<ADefenderKnight>(Defender))
@@ -367,6 +433,11 @@ ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
 			NearestDistSq = DistSq;
 			Nearest = Defender;
 		}
+	}
+
+	if (bHuntMine && NearestMine)
+	{
+		return NearestMine;
 	}
 
 	if (ShouldEngageDefenders() && NearestKnight)

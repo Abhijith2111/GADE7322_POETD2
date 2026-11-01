@@ -71,7 +71,7 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Grid")
 	UMaterialInterface* TerrainMaterial;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "3", ClampMax = "3"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "3", ClampMax = "5"))
 	int32 NumPathways = 3;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|Pathways", meta = (ClampMin = "0"))
@@ -182,6 +182,9 @@ public:
 	UFUNCTION(CallInEditor, BlueprintCallable, Category = "Terrain")
 	void RandomizeSeedAndRegenerate();
 
+	UFUNCTION(BlueprintCallable, Category = "Terrain")
+	void PrepareMatchBoard(int32 LaneCount);
+
 	UFUNCTION(BlueprintPure, Category = "Terrain")
 	FVector GridToWorldLocation(int32 GridX, int32 GridY) const;
 
@@ -200,6 +203,9 @@ public:
 private:
 	FRandomStream RandomStream;
 	TSet<FIntPoint> PathCellSet;
+	bool bMatchPrepared = false;
+	bool bUseMatchLaneCount = false;
+	int32 MatchLaneCount = 3;
 
 	void GenerateGridMesh();
 	void GeneratePathways();

@@ -2,7 +2,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
 #include "EnemyBase.h"
-#include "HealthBarWidget.h"
+#include "WorldHealthBar.h"
 #include "TimerManager.h"
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
@@ -44,9 +44,9 @@ void ADefenderBog::ApplyDefenderMesh()
 		TileSize = FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y);
 	}
 
-	if (UStaticMesh* Mesh = DefenderMesh->GetStaticMesh())
+	if (UStaticMesh* SpireAsset = DefenderMesh->GetStaticMesh())
 	{
-		const FBox MeshBox = Mesh->GetBoundingBox();
+		const FBox MeshBox = SpireAsset->GetBoundingBox();
 		const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
 		const float Uniform = (TileSize * 0.7f) / MeshWidth;
 		DefenderMesh->SetWorldScale3D(FVector(Uniform));
@@ -65,7 +65,7 @@ void ADefenderBog::BeginPlay()
 			(LocalBounds.Min.X + LocalBounds.Max.X) * 0.5f,
 			(LocalBounds.Min.Y + LocalBounds.Max.Y) * 0.5f,
 			LocalBounds.Max.Z + (24.f / ScaleZ));
-		UHealthBarWidget::ConfigureComponent(HealthBarWidget, BarOffset, FVector2D(90.f, 12.f));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, BarOffset, FVector2D(160.f, 18.f));
 	}
 }
 

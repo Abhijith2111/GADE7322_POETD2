@@ -2,10 +2,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Engine/EngineTypes.h"
 #include "TDGameMode.h"
-#include "GameOverWidget.h"
-#include "TDHUDWidget.h"
-#include "PauseMenuWidget.h"
-#include "MainMenuWidget.h"
+#include "GameOverViewInterface.h"
 #include "UObject/ConstructorHelpers.h"
 #include "TimerManager.h"
 #include "GameFramework/Pawn.h"
@@ -15,35 +12,57 @@
 #include "CentralTowerBase.h"
 #include "DefenderBog.h"
 #include "DefenderMineShaft.h"
+#include "EnemySpawner.h"
+#include "Blueprint/UserWidget.h"
+#include "Components/Button.h"
+#include "Components/PanelWidget.h"
+#include "Components/TextBlock.h"
+#include "Engine/Font.h"
+
+namespace
+{
+	void ApplyReadableFont(UWidget* Widget)
+	{
+		if (!Widget)
+		{
+			return;
+		}
+
+		if (UTextBlock* Text = Cast<UTextBlock>(Widget))
+		{
+			UFont* Font = LoadObject<UFont>(nullptr, TEXT("/Engine/EngineFonts/Roboto.Roboto"));
+			if (Font)
+			{
+				const FSlateFontInfo Current = Text->GetFont();
+				const FName Face = Current.TypefaceFontName.IsNone() ? FName(TEXT("Bold")) : Current.TypefaceFontName;
+				const float Size = Current.Size > 1.f ? Current.Size : 22.f;
+				Text->SetFont(FSlateFontInfo(Font, Size, Face));
+			}
+			if (Cast<UButton>(Text->GetParent()))
+			{
+				Text->SetColorAndOpacity(FSlateColor(FLinearColor(0.05f, 0.05f, 0.05f)));
+			}
+		}
+
+		if (UUserWidget* Nested = Cast<UUserWidget>(Widget))
+		{
+			ApplyReadableFont(Nested->GetRootWidget());
+		}
+
+		if (UPanelWidget* Panel = Cast<UPanelWidget>(Widget))
+		{
+			for (int32 ChildIndex = 0; ChildIndex < Panel->GetChildrenCount(); ++ChildIndex)
+			{
+				ApplyReadableFont(Panel->GetChildAt(ChildIndex));
+			}
+		}
+	}
+}
 
 ATDPlayerController::ATDPlayerController()
 {
 	PrimaryActorTick.bCanEverTick = true;
 	PrimaryActorTick.TickGroup = TG_PostUpdateWork;
-
-	static ConstructorHelpers::FClassFinder<UUserWidget> HUDBP(TEXT("/Game/UI/WBP_TDHUD"));
-	if (HUDBP.Succeeded())
-	{
-		HUDClass = HUDBP.Class;
-	}
-
-	static ConstructorHelpers::FClassFinder<UUserWidget> PauseBP(TEXT("/Game/UI/WBP_PauseMenu"));
-	if (PauseBP.Succeeded())
-	{
-		PauseMenuClass = PauseBP.Class;
-	}
-
-	static ConstructorHelpers::FClassFinder<UUserWidget> GameOverBP(TEXT("/Game/UI/WBP_GameOver"));
-	if (GameOverBP.Succeeded())
-	{
-		GameOverClass = GameOverBP.Class;
-	}
-
-	static ConstructorHelpers::FClassFinder<UUserWidget> MainMenuBP(TEXT("/Game/UI/WBP_MainMenu"));
-	if (MainMenuBP.Succeeded())
-	{
-		MainMenuClass = MainMenuBP.Class;
-	}
 
 	static ConstructorHelpers::FClassFinder<ADefenderBase> DefenderBP(TEXT("/Game/Gameplay/LevelObjects/BP_DefenderBase"));
 	if (DefenderBP.Succeeded())
@@ -87,13 +106,14 @@ void ATDPlayerController::BeginPlay()
 
 	TerrainRef = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass()));
 
-	EnsureWidgetClasses();
+	EnsureUIClasses();
 
 	if (HUDClass)
 	{
 		HUDInstance = CreateWidget<UUserWidget>(this, HUDClass);
 		if (HUDInstance)
 		{
+			ApplyReadableFont(HUDInstance);
 			HUDInstance->AddToViewport(0);
 		}
 	}
@@ -293,8 +313,13 @@ void ATDPlayerController::RestartMatch()
 	UGameplayStatics::OpenLevel(this, FName(*LevelName), true, TEXT("SkipMenu=1"));
 }
 
-void ATDPlayerController::StartMatchFromMenu()
+void ATDPlayerController::StartMatchFromMenu(ETDDifficulty Difficulty)
 {
+	if (UTDGameInstance* TDInstance = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		TDInstance->SetDifficulty(Difficulty);
+	}
+
 	bInMainMenu = false;
 	if (MainMenuInstance)
 	{
@@ -328,6 +353,16 @@ void ATDPlayerController::StartMatchFromMenu()
 	}
 
 	PlaceOverviewCamera();
+
+	TArray<AActor*> Spawners;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemySpawner::StaticClass(), Spawners);
+	for (AActor* Actor : Spawners)
+	{
+		if (AEnemySpawner* Spawner = Cast<AEnemySpawner>(Actor))
+		{
+			Spawner->StartSpawning();
+		}
+	}
 }
 
 void ATDPlayerController::ReturnToMainMenu()
@@ -373,39 +408,35 @@ void ATDPlayerController::ReturnToMainMenu()
 	UGameplayStatics::OpenLevel(this, FName(*LevelName));
 }
 
-void ATDPlayerController::EnsureWidgetClasses()
+void ATDPlayerController::EnsureUIClasses()
 {
-	auto Resolve = [](TSubclassOf<UUserWidget>& Slot, const TCHAR* Path, UClass* NativeClass)
+	auto LoadUI = [](TSubclassOf<UUserWidget>& Slot, const TCHAR* Path)
 	{
-		if (Slot && Slot != NativeClass)
+		if (Slot)
 		{
 			return;
 		}
 
-		if (UClass* Loaded = LoadClass<UUserWidget>(nullptr, Path))
-		{
-			Slot = Loaded;
-			return;
-		}
-
+		Slot = LoadClass<UUserWidget>(nullptr, Path);
 		if (!Slot)
 		{
-			Slot = NativeClass;
+			UE_LOG(LogTemp, Warning, TEXT("TDPlayerController: Missing UI widget %s"), Path);
 		}
 	};
 
-	Resolve(HUDClass, TEXT("/Game/UI/WBP_TDHUD.WBP_TDHUD_C"), UTDHUDWidget::StaticClass());
-	Resolve(PauseMenuClass, TEXT("/Game/UI/WBP_PauseMenu.WBP_PauseMenu_C"), UPauseMenuWidget::StaticClass());
-	Resolve(GameOverClass, TEXT("/Game/UI/WBP_GameOver.WBP_GameOver_C"), UGameOverWidget::StaticClass());
-	Resolve(MainMenuClass, TEXT("/Game/UI/WBP_MainMenu.WBP_MainMenu_C"), UMainMenuWidget::StaticClass());
+	LoadUI(HUDClass, TEXT("/Game/UI/WBP_TDHUD.WBP_TDHUD_C"));
+	LoadUI(PauseMenuClass, TEXT("/Game/UI/WBP_PauseMenu.WBP_PauseMenu_C"));
+	LoadUI(GameOverClass, TEXT("/Game/UI/WBP_GameOver.WBP_GameOver_C"));
+	LoadUI(MainMenuClass, TEXT("/Game/UI/WBP_MainMenu.WBP_MainMenu_C"));
 }
 
 void ATDPlayerController::ShowMainMenu()
 {
-	EnsureWidgetClasses();
+	EnsureUIClasses();
 	if (!MainMenuInstance)
 	{
 		MainMenuInstance = CreateWidget<UUserWidget>(this, MainMenuClass);
+		ApplyReadableFont(MainMenuInstance);
 	}
 	if (MainMenuInstance && !MainMenuInstance->IsInViewport())
 	{
@@ -475,10 +506,10 @@ void ATDPlayerController::SetPausedState(bool bPause)
 
 	if (bIsPaused)
 	{
-		EnsureWidgetClasses();
 		if (!PauseMenuInstance && PauseMenuClass)
 		{
 			PauseMenuInstance = CreateWidget<UUserWidget>(this, PauseMenuClass);
+			ApplyReadableFont(PauseMenuInstance);
 		}
 
 		if (PauseMenuInstance)
@@ -546,16 +577,21 @@ void ATDPlayerController::ShowGameOver(bool bVictory)
 	SetPause(true);
 	bIsPaused = true;
 
-	EnsureWidgetClasses();
+	EnsureUIClasses();
 
 	if (!GameOverInstance && GameOverClass)
 	{
 		GameOverInstance = CreateWidget<UUserWidget>(this, GameOverClass);
+		ApplyReadableFont(GameOverInstance);
 	}
 
-	if (UGameOverWidget* GO = Cast<UGameOverWidget>(GameOverInstance))
+	if (GameOverInstance && GameOverInstance->GetClass()->ImplementsInterface(UGameOverViewInterface::StaticClass()))
 	{
-		GO->ShowResult(bVictory);
+		IGameOverViewInterface::Execute_ShowResult(GameOverInstance, bVictory);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TDPlayerController: Game over widget is missing ShowResult."));
 	}
 
 	if (GameOverInstance)
@@ -810,4 +846,52 @@ void ATDPlayerController::TryUpgradeDefender()
 		NewLevel, ClickedDefender->MaxHealth, ClickedDefender->AttackDamage);
 
 	OnDefenderUpgraded.Broadcast(ClickedDefender, NewLevel);
+}
+
+void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf<ADefenderBase> InDefenderClass, int32 Cost)
+{
+	if (!Button)
+	{
+		return;
+	}
+
+	bool bMinePlaced = false;
+	if (InDefenderClass && InDefenderClass->IsChildOf(ADefenderMineShaft::StaticClass()))
+	{
+		TArray<AActor*> ExistingMines;
+		UGameplayStatics::GetAllActorsOfClass(this, ADefenderMineShaft::StaticClass(), ExistingMines);
+		for (AActor* Actor : ExistingMines)
+		{
+			const ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Actor);
+			if (Mine && !Mine->IsDestroyed())
+			{
+				bMinePlaced = true;
+				break;
+			}
+		}
+	}
+
+	const ATDGameState* GameState = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr;
+	const int32 Money = GameState ? GameState->GetCurrentMoney() : 0;
+	const bool bCanAfford = InDefenderClass && Money >= Cost && !bMinePlaced;
+
+	FLinearColor ButtonColor(1.f, 0.55f, 0.05f, 1.f);
+	FLinearColor LabelColor(0.05f, 0.05f, 0.05f, 1.f);
+	if (bMinePlaced)
+	{
+		ButtonColor = FLinearColor(0.28f, 0.28f, 0.28f, 1.f);
+		LabelColor = FLinearColor(0.85f, 0.85f, 0.85f, 1.f);
+	}
+	else if (!bCanAfford)
+	{
+		ButtonColor = FLinearColor(0.45f, 0.06f, 0.05f, 1.f);
+		LabelColor = FLinearColor::White;
+	}
+
+	Button->SetBackgroundColor(ButtonColor);
+	Button->SetIsEnabled(!bMinePlaced);
+	if (UTextBlock* Caption = Cast<UTextBlock>(Button->GetChildAt(0)))
+	{
+		Caption->SetColorAndOpacity(FSlateColor(LabelColor));
+	}
 }

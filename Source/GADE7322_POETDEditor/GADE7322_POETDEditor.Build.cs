@@ -6,7 +6,7 @@ public class GADE7322_POETDEditor : ModuleRules
     {
         PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 
-        PublicDependencyModuleNames.AddRange(new string[]
+        PrivateDependencyModuleNames.AddRange(new string[]
         {
             "Core",
             "CoreUObject",
@@ -14,17 +14,12 @@ public class GADE7322_POETDEditor : ModuleRules
             "UnrealEd",
             "UMG",
             "UMGEditor",
+            "BlueprintGraph",
+            "KismetCompiler",
             "Slate",
             "SlateCore",
+            "AssetRegistry",
             "GADE7322_POETD"
         });
-
-        PrivateDependencyModuleNames.AddRange(new string[]
-        {
-            "AssetRegistry",
-            "Kismet"
-        });
-
-        PrivateIncludePaths.Add(System.IO.Path.Combine(ModuleDirectory, "..", "GADE7322_POETD"));
     }
 }
