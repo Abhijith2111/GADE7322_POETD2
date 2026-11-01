@@ -6,6 +6,7 @@
 #include "TDGameState.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "TDGameInstance.h"
 
 ADefenderMineShaft::ADefenderMineShaft()
 {
@@ -65,6 +66,19 @@ void ADefenderMineShaft::ApplyDefenderMesh()
 
 void ADefenderMineShaft::BeginPlay()
 {
+	PayoutInterval = 12.f;
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Medium)
+		{
+			PayoutInterval = 20.f;
+		}
+		else if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			PayoutInterval = 30.f;
+		}
+	}
+
 	Super::BeginPlay();
 
 	const float Interval = FMath::Max(PayoutInterval, 1.f);

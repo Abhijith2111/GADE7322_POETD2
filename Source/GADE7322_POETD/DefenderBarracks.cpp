@@ -5,6 +5,7 @@
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
+#include "TDGameInstance.h"
 
 ADefenderBarracks::ADefenderBarracks()
 {
@@ -57,6 +58,22 @@ void ADefenderBarracks::ApplyDefenderMesh()
 
 void ADefenderBarracks::BeginPlay()
 {
+	KnightCount = 5;
+	KnightTrainInterval = 10.f;
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Medium)
+		{
+			KnightCount = 3;
+			KnightTrainInterval = 15.f;
+		}
+		else if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			KnightCount = 1;
+			KnightTrainInterval = 30.f;
+		}
+	}
+
 	Super::BeginPlay();
 	SpawnKnights();
 
@@ -115,4 +132,17 @@ void ADefenderBarracks::SpawnOneKnight()
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 	World->SpawnActor<ADefenderKnight>(ADefenderKnight::StaticClass(), GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParams);
+}
+
+void ADefenderBarracks::ApplyTrainUpgrade()
+{
+	KnightTrainInterval = FMath::Max(1.f, KnightTrainInterval - 3.f);
+	if (!GetWorld())
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(TrainTimerHandle);
+	const float Interval = KnightTrainInterval;
+	GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, Interval);
 }

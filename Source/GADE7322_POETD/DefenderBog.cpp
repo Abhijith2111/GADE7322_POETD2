@@ -6,6 +6,7 @@
 #include "TimerManager.h"
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
+#include "TDGameInstance.h"
 
 ADefenderBog::ADefenderBog()
 {
@@ -55,6 +56,19 @@ void ADefenderBog::ApplyDefenderMesh()
 
 void ADefenderBog::BeginPlay()
 {
+	DigestDuration = 20.f;
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Medium)
+		{
+			DigestDuration = 45.f;
+		}
+		else if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			DigestDuration = 60.f;
+		}
+	}
+
 	Super::BeginPlay();
 
 	if (DefenderMesh && DefenderMesh->GetStaticMesh() && HealthBarWidget)
@@ -159,4 +173,9 @@ void ADefenderBog::ScanAndAttack()
 void ADefenderBog::FinishDigesting()
 {
 	bIsDigesting = false;
+}
+
+void ADefenderBog::ApplyDigestUpgrade()
+{
+	DigestDuration = FMath::Max(1.f, DigestDuration - 3.f);
 }

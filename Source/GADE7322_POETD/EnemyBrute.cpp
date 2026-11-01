@@ -7,6 +7,7 @@
 #include "CentralTowerBase.h"
 #include "WorldHealthBar.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "TDGameInstance.h"
 
 AEnemyBrute::AEnemyBrute()
 {
@@ -38,6 +39,14 @@ AEnemyBrute::AEnemyBrute()
 void AEnemyBrute::BeginPlay()
 {
 	Super::BeginPlay();
+
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			AttackDamage = 40.f;
+		}
+	}
 
 	AllowPassThroughFights();
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;

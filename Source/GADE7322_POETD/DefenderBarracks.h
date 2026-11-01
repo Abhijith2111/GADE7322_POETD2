@@ -11,6 +11,7 @@ class GADE7322_POETD_API ADefenderBarracks : public ADefenderBase
 
 public:
 	ADefenderBarracks();
+	void ApplyTrainUpgrade();
 
 protected:
 	virtual void BeginPlay() override;
