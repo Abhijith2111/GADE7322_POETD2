@@ -835,18 +835,6 @@ void ATDPlayerController::HandleDefenderDestroyed(ADefenderBase* DestroyedDefend
 
 void ATDPlayerController::TryUpgradeDefender()
 {
-	FHitResult Hit;
-	const bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), true, Hit);
-	if (!bHit || !Hit.GetActor())
-	{
-		return;
-	}
-
-	ADefenderBase* ClickedDefender = Cast<ADefenderBase>(Hit.GetActor());
-	if (ClickedDefender && IsUpgradableDefender(ClickedDefender))
-	{
-		OpenUpgradeMenu(ClickedDefender);
-	}
 }
 
 void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf<ADefenderBase> InDefenderClass, int32 Cost)
