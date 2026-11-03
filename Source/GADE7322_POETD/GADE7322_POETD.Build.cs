@@ -16,7 +16,8 @@ public class GADE7322_POETD : ModuleRules
             "ProceduralMeshComponent",
             "UMG",
             "Slate",
-            "SlateCore"
+            "SlateCore",
+            "Niagara"
         });
     }
 }

@@ -69,6 +69,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const;
 
+	void ApplyUpgradeVisual();
+
 private:
 	bool bIsDestroyed = false;
 	FTimerHandle AttackTimerHandle;

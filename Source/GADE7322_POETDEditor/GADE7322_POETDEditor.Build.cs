@@ -19,6 +19,10 @@ public class GADE7322_POETDEditor : ModuleRules
             "Slate",
             "SlateCore",
             "AssetRegistry",
+            "MaterialEditor",
+            "Niagara",
+            "NiagaraCore",
+            "NiagaraEditor",
             "GADE7322_POETD"
         });
     }

@@ -296,10 +296,10 @@ namespace
 			if (UObject* ExistingAsset = FindObject<UObject>(ExistingPackage, *Name))
 			{
 				ExistingAsset->ClearFlags(RF_Standalone | RF_Public);
-				ExistingAsset->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+				ExistingAsset->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_AllowPackageLinkerMismatch);
 			}
 			ExistingPackage->ClearFlags(RF_Standalone | RF_Public);
-			ExistingPackage->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_ForceNoResetLoaders);
+			ExistingPackage->Rename(nullptr, GetTransientPackage(), REN_DontCreateRedirectors | REN_NonTransactional | REN_AllowPackageLinkerMismatch);
 		}
 
 		UPackage* Package = CreatePackage(*PackageName);

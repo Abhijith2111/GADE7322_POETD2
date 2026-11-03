@@ -8,6 +8,9 @@
 #include "EnemyBase.h"
 #include "WorldHealthBar.h"
 #include "TDGameState.h"
+#include "Components/PostProcessComponent.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "GameVFX.h"
 
 ACentralTowerBase::ACentralTowerBase()
 {
@@ -15,6 +18,12 @@ ACentralTowerBase::ACentralTowerBase()
 
 	TowerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TowerMesh"));
 	RootComponent = TowerMesh;
+
+	TempleStrainPP = CreateDefaultSubobject<UPostProcessComponent>(TEXT("TempleStrainPP"));
+	TempleStrainPP->SetupAttachment(RootComponent);
+	TempleStrainPP->bUnbound = true;
+	TempleStrainPP->bEnabled = true;
+	TempleStrainPP->BlendWeight = 0.f;
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> TempleMeshAsset(TEXT("/Game/Buildings/Temple.Temple"));
 	if (TempleMeshAsset.Succeeded())
@@ -93,6 +102,21 @@ void ACentralTowerBase::BeginPlay()
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, HealthBarWidget->GetRelativeLocation(), HealthBarWidget->GetDrawSize());
 
+	if (UMaterialInterface* StrainMat = GameVFX::LoadTempleStrainMaterial())
+	{
+		TempleStrainMID = UMaterialInstanceDynamic::Create(StrainMat, this);
+		if (TempleStrainMID && TempleStrainPP)
+		{
+			TempleStrainPP->Settings.WeightedBlendables.Array.Reset();
+			FWeightedBlendable Blendable;
+			Blendable.Object = TempleStrainMID;
+			Blendable.Weight = 1.f;
+			TempleStrainPP->Settings.WeightedBlendables.Array.Add(Blendable);
+			TempleStrainMID->SetScalarParameterValue(TEXT("Intensity"), 0.f);
+			TempleStrainPP->BlendWeight = 0.f;
+		}
+	}
+
 	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
 	{
 		GS->RegisterCentralTower(this);
@@ -106,6 +130,7 @@ void ACentralTowerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	GetWorldTimerManager().ClearTimer(HitFlashTimer);
+	GetWorldTimerManager().ClearTimer(StrainDecayTimer);
 	if (HitFlashState.bActive)
 	{
 		EndHitFlash(HitFlashState, HitFlashMeshes, HitFlashMaterials);
@@ -199,6 +224,9 @@ void ACentralTowerBase::ApplyDamage(float DamageAmount)
 	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	PlayHitFlash();
+	HitStrainSpike = 0.45f;
+	UpdateTempleStrain();
+	GetWorldTimerManager().SetTimer(StrainDecayTimer, this, &ACentralTowerBase::DecayHitStrain, 0.08f, true);
 
 	if (CurrentHealth <= 0.f)
 	{
@@ -206,6 +234,31 @@ void ACentralTowerBase::ApplyDamage(float DamageAmount)
 		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 		OnTowerDestroyed.Broadcast();
 		UE_LOG(LogTemp, Warning, TEXT("CentralTowerBase destroyed!"));
+	}
+}
+
+void ACentralTowerBase::UpdateTempleStrain()
+{
+	const float Strain = FMath::Clamp((1.f - GetHealthPercent()) * 0.85f + HitStrainSpike, 0.f, 1.f);
+	if (TempleStrainMID)
+	{
+		TempleStrainMID->SetScalarParameterValue(TEXT("Intensity"), Strain);
+	}
+	if (TempleStrainPP)
+	{
+		TempleStrainPP->BlendWeight = Strain;
+	}
+}
+
+void ACentralTowerBase::DecayHitStrain()
+{
+	HitStrainSpike = FMath::Max(0.f, HitStrainSpike - 0.08f);
+	UpdateTempleStrain();
+	if (HitStrainSpike <= KINDA_SMALL_NUMBER)
+	{
+		HitStrainSpike = 0.f;
+		GetWorldTimerManager().ClearTimer(StrainDecayTimer);
+		UpdateTempleStrain();
 	}
 }
 

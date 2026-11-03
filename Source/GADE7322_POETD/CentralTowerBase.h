@@ -8,6 +8,8 @@
 #include "CentralTowerBase.generated.h"
 
 class AEnemyBase;
+class UPostProcessComponent;
+class UMaterialInstanceDynamic;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnCentralTowerHealthChanged, float, NewHealth, float, InMaxHealth);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnCentralTowerDestroyed);
@@ -33,6 +35,9 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UWidgetComponent* HealthBarWidget;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	TObjectPtr<UPostProcessComponent> TempleStrainPP;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Health", meta = (ClampMin = "1.0"))
 	float MaxHealth = 500.f;
@@ -76,10 +81,20 @@ private:
 	UPROPERTY()
 	TArray<UMaterialInterface*> HitFlashMaterials;
 
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> TempleStrainMID;
+
+	float HitStrainSpike = 0.f;
+	FTimerHandle StrainDecayTimer;
+
 	void PlayHitFlash();
+	void UpdateTempleStrain();
 
 	UFUNCTION()
 	void RestoreHitFlash();
+
+	UFUNCTION()
+	void DecayHitStrain();
 
 	UFUNCTION()
 	void ScanAndAttack();

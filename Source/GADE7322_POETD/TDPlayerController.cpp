@@ -16,7 +16,7 @@
 #include "DefenderMineShaft.h"
 #include "EnemySpawner.h"
 #include "UpgradeMenuWidget.h"
-#include "UpgradeSparkle.h"
+#include "GameVFX.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
@@ -1109,6 +1109,7 @@ void ATDPlayerController::ConfirmSelectedUpgrade()
 	}
 
 	*LevelPtr = 1;
+	Defender->ApplyUpgradeVisual();
 	PlayUpgradeSparkle(Defender);
 	OnDefenderUpgraded.Broadcast(Defender, 1);
 	RefreshUpgradeMenu();
@@ -1121,7 +1122,5 @@ void ATDPlayerController::PlayUpgradeSparkle(ADefenderBase* Defender)
 		return;
 	}
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	GetWorld()->SpawnActor<AUpgradeSparkle>(AUpgradeSparkle::StaticClass(), Defender->GetActorLocation() + FVector(0.f, 0.f, 80.f), FRotator::ZeroRotator, SpawnParams);
+	GameVFX::SpawnNiagaraAt(GetWorld(), GameVFX::LoadUpgradeBurstSystem(), Defender->GetActorLocation() + FVector(0.f, 0.f, 80.f));
 }

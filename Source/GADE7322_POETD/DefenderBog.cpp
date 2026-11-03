@@ -7,6 +7,7 @@
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
 #include "TDGameInstance.h"
+#include "GameVFX.h"
 
 ADefenderBog::ADefenderBog()
 {
@@ -70,6 +71,8 @@ void ADefenderBog::BeginPlay()
 	}
 
 	Super::BeginPlay();
+
+	GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadBogSlimeMaterial());
 
 	if (DefenderMesh && DefenderMesh->GetStaticMesh() && HealthBarWidget)
 	{
