@@ -724,18 +724,33 @@ void AProceduralTerrain::SpawnPathTiles()
 		}
 		else
 		{
-			FIntPoint Stem = NeighborDirs[0];
-			for (const FIntPoint& Dir : NeighborDirs)
+			FIntPoint DirA = NeighborDirs[0];
+			FIntPoint DirB = NeighborDirs[1];
+			for (int32 i = 0; i < NeighborDirs.Num(); ++i)
 			{
-				if (!NeighborDirs.Contains(FIntPoint(-Dir.X, -Dir.Y)))
+				for (int32 j = i + 1; j < NeighborDirs.Num(); ++j)
 				{
-					Stem = Dir;
-					break;
+					if (NeighborDirs[i].X * NeighborDirs[j].X + NeighborDirs[i].Y * NeighborDirs[j].Y == 0)
+					{
+						DirA = NeighborDirs[i];
+						DirB = NeighborDirs[j];
+						i = NeighborDirs.Num();
+						break;
+					}
 				}
 			}
 
-			Yaw = YawForDirection(Stem) - 90.f + PathTileYawOffset;
-			TileISM = (TJunctionTileISM && TJunctionTileISM->GetStaticMesh()) ? TJunctionTileISM : StraightTileISM;
+			FIntPoint InDir(-DirA.X, -DirA.Y);
+			FIntPoint OutDir = DirB;
+			int32 CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
+			if (CrossZ == 0)
+			{
+				InDir = FIntPoint(-DirB.X, -DirB.Y);
+				OutDir = DirA;
+				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
+			}
+			Yaw = YawForDirection(InDir) + PathTileYawOffset;
+			TileISM = PickTurnISM(CrossZ);
 		}
 
 		SpawnTileInstance(TileISM, Cell, Yaw, PathZ, PathFit);

@@ -6,10 +6,12 @@
 #include "TimerManager.h"
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
+#include "TDGameInstance.h"
+#include "GameVFX.h"
 
 ADefenderBog::ADefenderBog()
 {
-	MaxHealth = 300.f;
+	MaxHealth = 250.f;
 	AttackRange = 220.f;
 	AttackDamage = 0.f;
 	AttackInterval = 0.25f;
@@ -55,7 +57,22 @@ void ADefenderBog::ApplyDefenderMesh()
 
 void ADefenderBog::BeginPlay()
 {
+	DigestDuration = 20.f;
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Medium)
+		{
+			DigestDuration = 45.f;
+		}
+		else if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			DigestDuration = 60.f;
+		}
+	}
+
 	Super::BeginPlay();
+
+	GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadBogSlimeMaterial());
 
 	if (DefenderMesh && DefenderMesh->GetStaticMesh() && HealthBarWidget)
 	{
@@ -159,4 +176,9 @@ void ADefenderBog::ScanAndAttack()
 void ADefenderBog::FinishDigesting()
 {
 	bIsDigesting = false;
+}
+
+void ADefenderBog::ApplyDigestUpgrade()
+{
+	DigestDuration = FMath::Max(1.f, DigestDuration - 3.f);
 }

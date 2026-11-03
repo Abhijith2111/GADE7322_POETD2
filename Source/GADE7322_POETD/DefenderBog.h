@@ -14,6 +14,7 @@ class GADE7322_POETD_API ADefenderBog : public ADefenderBase
 
 public:
 	ADefenderBog();
+	void ApplyDigestUpgrade();
 
 protected:
 	virtual void BeginPlay() override;

@@ -10,6 +10,7 @@
 #include "TDPlayerController.generated.h"
 
 class UButton;
+class UUpgradeMenuWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementFailed, FString, Reason);
@@ -81,6 +82,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Upgrade")
 	void TryUpgradeDefender();
 
+	UFUNCTION(BlueprintCallable, Category = "Upgrade")
+	void ConfirmSelectedUpgrade();
+
+	UFUNCTION(BlueprintCallable, Category = "Upgrade")
+	void CloseUpgradeMenu();
+
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void TogglePause();
 
@@ -130,10 +137,17 @@ private:
 	UPROPERTY()
 	UUserWidget* MainMenuInstance;
 
+	UPROPERTY()
+	UUpgradeMenuWidget* UpgradeMenuInstance;
+
+	TWeakObjectPtr<ADefenderBase> SelectedUpgradeTarget;
+	bool bUpgradeCameraActive = false;
+
 	bool bIsPaused = false;
 	bool bInMainMenu = false;
 
 	void SetPausedState(bool bPause);
+	void EnsureWidgetClasses();
 
 	UFUNCTION()
 	void HandleGameLoss();
@@ -167,4 +181,14 @@ private:
 	void PlaceOverviewCamera();
 
 	void ClampOverviewCamera();
+	void ZoomToDefender(ADefenderBase* Defender);
+	void OpenUpgradeMenu(ADefenderBase* Defender);
+	bool IsUpgradableDefender(const ADefenderBase* Defender) const;
+	int32 GetUpgradeCostFor(const ADefenderBase* Defender) const;
+	FText GetUpgradeBonusText(const ADefenderBase* Defender) const;
+	int32 GetBogCap() const;
+	int32 CountLivingBogs() const;
+	bool IsBogCapReached() const;
+	void PlayUpgradeSparkle(ADefenderBase* Defender);
+	void RefreshUpgradeMenu();
 };

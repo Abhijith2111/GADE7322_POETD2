@@ -11,8 +11,12 @@
 #include "Camera/PlayerCameraManager.h"
 #include "CentralTowerBase.h"
 #include "DefenderBog.h"
+#include "DefenderBarracks.h"
+#include "DefenderKnight.h"
 #include "DefenderMineShaft.h"
 #include "EnemySpawner.h"
+#include "UpgradeMenuWidget.h"
+#include "GameVFX.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
@@ -213,7 +217,10 @@ void ATDPlayerController::PlaceOverviewCamera()
 void ATDPlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-	ClampOverviewCamera();
+	if (!bUpgradeCameraActive)
+	{
+		ClampOverviewCamera();
+	}
 }
 
 void ATDPlayerController::ClampOverviewCamera()
@@ -432,6 +439,7 @@ void ATDPlayerController::EnsureUIClasses()
 
 void ATDPlayerController::ShowMainMenu()
 {
+	CloseUpgradeMenu();
 	EnsureUIClasses();
 	if (!MainMenuInstance)
 	{
@@ -676,6 +684,24 @@ void ATDPlayerController::TryPlaceDefender()
 	FHitResult Hit;
 	const bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), true, Hit);
 
+	ADefenderBase* ClickedDefender = nullptr;
+	if (bHit && Hit.GetActor())
+	{
+		ClickedDefender = Cast<ADefenderBase>(Hit.GetActor());
+	}
+
+	if (ClickedDefender && IsUpgradableDefender(ClickedDefender))
+	{
+		OpenUpgradeMenu(ClickedDefender);
+		return;
+	}
+
+	if (SelectedUpgradeTarget.IsValid())
+	{
+		CloseUpgradeMenu();
+		return;
+	}
+
 	if (!bHit)
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("No valid surface under cursor."));
@@ -747,6 +773,12 @@ void ATDPlayerController::TryPlaceDefender()
 		}
 	}
 
+	if (DefenderClass->IsChildOf(ADefenderBog::StaticClass()) && IsBogCapReached())
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Bog limit reached for this difficulty."));
+		return;
+	}
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
@@ -794,58 +826,15 @@ void ATDPlayerController::HandleDefenderDestroyed(ADefenderBase* DestroyedDefend
 	}
 
 	DefenderUpgradeLevels.Remove(DestroyedDefender);
+
+	if (SelectedUpgradeTarget.Get() == DestroyedDefender)
+	{
+		CloseUpgradeMenu();
+	}
 }
 
 void ATDPlayerController::TryUpgradeDefender()
 {
-	FHitResult Hit;
-	const bool bHit = GetHitResultUnderCursorByChannel(UEngineTypes::ConvertToTraceType(ECC_Visibility), true, Hit);
-
-	if (!bHit || !Hit.GetActor())
-	{
-		return;
-	}
-
-	ADefenderBase* ClickedDefender = Cast<ADefenderBase>(Hit.GetActor());
-	if (!ClickedDefender)
-	{
-		UE_LOG(LogTemp, Log, TEXT("TDPlayerController: Clicked actor is not a defender."));
-		return;
-	}
-
-	int32* LevelPtr = DefenderUpgradeLevels.Find(ClickedDefender);
-	if (!LevelPtr)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("TDPlayerController: Clicked defender not tracked."));
-		return;
-	}
-
-	const int32 CurrentLevel = *LevelPtr;
-	if (CurrentLevel >= MaxUpgradeLevel)
-	{
-		OnDefenderPlacementFailed.Broadcast(TEXT("Defender is already at maximum upgrade level."));
-		return;
-	}
-
-	if (!HasEnoughMoney(UpgradeCost))
-	{
-		OnDefenderPlacementFailed.Broadcast(TEXT("Not enough gold to upgrade."));
-		return;
-	}
-
-	SpendMoney(UpgradeCost);
-
-	ClickedDefender->MaxHealth += UpgradeHealthBonus;
-	ClickedDefender->CurrentHealth = FMath::Min(ClickedDefender->CurrentHealth + UpgradeHealthBonus, ClickedDefender->MaxHealth);
-	ClickedDefender->AttackDamage += UpgradeDamageBonus;
-
-	const int32 NewLevel = CurrentLevel + 1;
-	DefenderUpgradeLevels[ClickedDefender] = NewLevel;
-
-	UE_LOG(LogTemp, Log, TEXT("TDPlayerController: Defender upgraded to level %d. MaxHealth: %.0f, AttackDamage: %.1f"),
-		NewLevel, ClickedDefender->MaxHealth, ClickedDefender->AttackDamage);
-
-	OnDefenderUpgraded.Broadcast(ClickedDefender, NewLevel);
 }
 
 void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf<ADefenderBase> InDefenderClass, int32 Cost)
@@ -855,7 +844,7 @@ void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf
 		return;
 	}
 
-	bool bMinePlaced = false;
+	bool bLocked = false;
 	if (InDefenderClass && InDefenderClass->IsChildOf(ADefenderMineShaft::StaticClass()))
 	{
 		TArray<AActor*> ExistingMines;
@@ -865,19 +854,23 @@ void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf
 			const ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Actor);
 			if (Mine && !Mine->IsDestroyed())
 			{
-				bMinePlaced = true;
+				bLocked = true;
 				break;
 			}
 		}
 	}
+	else if (InDefenderClass && InDefenderClass->IsChildOf(ADefenderBog::StaticClass()) && IsBogCapReached())
+	{
+		bLocked = true;
+	}
 
 	const ATDGameState* GameState = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr;
 	const int32 Money = GameState ? GameState->GetCurrentMoney() : 0;
-	const bool bCanAfford = InDefenderClass && Money >= Cost && !bMinePlaced;
+	const bool bCanAfford = InDefenderClass && Money >= Cost && !bLocked;
 
 	FLinearColor ButtonColor(1.f, 0.55f, 0.05f, 1.f);
 	FLinearColor LabelColor(0.05f, 0.05f, 0.05f, 1.f);
-	if (bMinePlaced)
+	if (bLocked)
 	{
 		ButtonColor = FLinearColor(0.28f, 0.28f, 0.28f, 1.f);
 		LabelColor = FLinearColor(0.85f, 0.85f, 0.85f, 1.f);
@@ -889,9 +882,245 @@ void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf
 	}
 
 	Button->SetBackgroundColor(ButtonColor);
-	Button->SetIsEnabled(!bMinePlaced);
+	Button->SetIsEnabled(!bLocked);
 	if (UTextBlock* Caption = Cast<UTextBlock>(Button->GetChildAt(0)))
 	{
 		Caption->SetColorAndOpacity(FSlateColor(LabelColor));
 	}
+}
+
+bool ATDPlayerController::IsUpgradableDefender(const ADefenderBase* Defender) const
+{
+	if (!Defender || Defender->IsDestroyed())
+	{
+		return false;
+	}
+	if (Defender->IsA(ADefenderKnight::StaticClass()) || Defender->IsA(ADefenderMineShaft::StaticClass()))
+	{
+		return false;
+	}
+	return Defender->IsA(ADefenderBog::StaticClass())
+		|| Defender->IsA(ADefenderBarracks::StaticClass())
+		|| Defender->IsA(ADefenderBase::StaticClass());
+}
+
+int32 ATDPlayerController::GetUpgradeCostFor(const ADefenderBase* Defender) const
+{
+	if (!Defender)
+	{
+		return 0;
+	}
+	if (Defender->IsA(ADefenderBog::StaticClass()))
+	{
+		return 200;
+	}
+	if (Defender->IsA(ADefenderBarracks::StaticClass()))
+	{
+		return 150;
+	}
+	return 100;
+}
+
+FText ATDPlayerController::GetUpgradeBonusText(const ADefenderBase* Defender) const
+{
+	if (!Defender)
+	{
+		return FText::GetEmpty();
+	}
+	if (Defender->IsA(ADefenderBog::StaticClass()))
+	{
+		return NSLOCTEXT("Upgrade", "BogBonus", "Level 1: digestion 3 seconds faster");
+	}
+	if (Defender->IsA(ADefenderBarracks::StaticClass()))
+	{
+		return NSLOCTEXT("Upgrade", "BarracksBonus", "Level 1: knights train 3 seconds faster");
+	}
+	return NSLOCTEXT("Upgrade", "ArcherBonus", "Level 1: +20 health and +5 damage");
+}
+
+int32 ATDPlayerController::GetBogCap() const
+{
+	if (const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance()))
+	{
+		if (GI->GetDifficulty() == ETDDifficulty::Medium)
+		{
+			return 5;
+		}
+		if (GI->GetDifficulty() == ETDDifficulty::Hard)
+		{
+			return 3;
+		}
+	}
+	return 0;
+}
+
+int32 ATDPlayerController::CountLivingBogs() const
+{
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderBog::StaticClass(), Found);
+	int32 Count = 0;
+	for (AActor* Actor : Found)
+	{
+		const ADefenderBog* Bog = Cast<ADefenderBog>(Actor);
+		if (Bog && !Bog->IsDestroyed())
+		{
+			++Count;
+		}
+	}
+	return Count;
+}
+
+bool ATDPlayerController::IsBogCapReached() const
+{
+	const int32 Cap = GetBogCap();
+	return Cap > 0 && CountLivingBogs() >= Cap;
+}
+
+void ATDPlayerController::ZoomToDefender(ADefenderBase* Defender)
+{
+	if (!Defender || !GetPawn())
+	{
+		return;
+	}
+
+	const FVector Focus = Defender->GetActorLocation();
+	const float Height = 520.f;
+	const FVector CameraLocation = Focus + FVector(-Height * 0.55f, 0.f, Height);
+	const FRotator CameraRotation = (Focus - CameraLocation).Rotation();
+
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->SetActorEnableCollision(false);
+		ControlledPawn->SetActorLocationAndRotation(CameraLocation, CameraRotation, false, nullptr, ETeleportType::TeleportPhysics);
+		if (UPawnMovementComponent* Movement = ControlledPawn->GetMovementComponent())
+		{
+			Movement->StopMovementImmediately();
+			Movement->Velocity = FVector::ZeroVector;
+		}
+	}
+
+	SetControlRotation(CameraRotation);
+	if (PlayerCameraManager)
+	{
+		PlayerCameraManager->ViewPitchMin = -89.f;
+		PlayerCameraManager->ViewPitchMax = 0.f;
+		PlayerCameraManager->SetGameCameraCutThisFrame();
+	}
+	bUpgradeCameraActive = true;
+}
+
+void ATDPlayerController::OpenUpgradeMenu(ADefenderBase* Defender)
+{
+	if (!Defender || !IsUpgradableDefender(Defender))
+	{
+		return;
+	}
+
+	SelectedUpgradeTarget = Defender;
+	if (!UpgradeMenuInstance)
+	{
+		UpgradeMenuInstance = CreateWidget<UUpgradeMenuWidget>(this, UUpgradeMenuWidget::StaticClass());
+		if (UpgradeMenuInstance)
+		{
+			UpgradeMenuInstance->BindController(this);
+			UpgradeMenuInstance->AddToViewport(20);
+		}
+	}
+	if (UpgradeMenuInstance)
+	{
+		UpgradeMenuInstance->SetVisibility(ESlateVisibility::Visible);
+		RefreshUpgradeMenu();
+	}
+	ZoomToDefender(Defender);
+}
+
+void ATDPlayerController::RefreshUpgradeMenu()
+{
+	ADefenderBase* Defender = SelectedUpgradeTarget.Get();
+	if (!UpgradeMenuInstance || !Defender)
+	{
+		return;
+	}
+
+	const int32* LevelPtr = DefenderUpgradeLevels.Find(Defender);
+	const int32 Level = LevelPtr ? *LevelPtr : 0;
+	UpgradeMenuInstance->ShowForDefender(Defender, GetUpgradeCostFor(Defender), Level, GetUpgradeBonusText(Defender));
+}
+
+void ATDPlayerController::CloseUpgradeMenu()
+{
+	SelectedUpgradeTarget.Reset();
+	if (UpgradeMenuInstance)
+	{
+		UpgradeMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	bUpgradeCameraActive = false;
+	if (PlayerCameraManager)
+	{
+		PlayerCameraManager->ViewPitchMin = -89.f;
+		PlayerCameraManager->ViewPitchMax = -20.f;
+	}
+	PlaceOverviewCamera();
+}
+
+void ATDPlayerController::ConfirmSelectedUpgrade()
+{
+	ADefenderBase* Defender = SelectedUpgradeTarget.Get();
+	if (!Defender || !IsUpgradableDefender(Defender))
+	{
+		return;
+	}
+
+	int32* LevelPtr = DefenderUpgradeLevels.Find(Defender);
+	if (!LevelPtr)
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Clicked defender not tracked."));
+		return;
+	}
+	if (*LevelPtr >= 1)
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("No further upgrades."));
+		RefreshUpgradeMenu();
+		return;
+	}
+
+	const int32 Cost = GetUpgradeCostFor(Defender);
+	if (!HasEnoughMoney(Cost))
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Not enough gold to upgrade."));
+		return;
+	}
+
+	SpendMoney(Cost);
+
+	if (ADefenderBog* Bog = Cast<ADefenderBog>(Defender))
+	{
+		Bog->ApplyDigestUpgrade();
+	}
+	else if (ADefenderBarracks* Barracks = Cast<ADefenderBarracks>(Defender))
+	{
+		Barracks->ApplyTrainUpgrade();
+	}
+	else
+	{
+		Defender->MaxHealth += 20.f;
+		Defender->CurrentHealth = FMath::Min(Defender->CurrentHealth + 20.f, Defender->MaxHealth);
+		Defender->AttackDamage += 5.f;
+	}
+
+	*LevelPtr = 1;
+	Defender->ApplyUpgradeVisual();
+	PlayUpgradeSparkle(Defender);
+	OnDefenderUpgraded.Broadcast(Defender, 1);
+	RefreshUpgradeMenu();
+}
+
+void ATDPlayerController::PlayUpgradeSparkle(ADefenderBase* Defender)
+{
+	if (!Defender || !GetWorld())
+	{
+		return;
+	}
+
+	GameVFX::SpawnNiagaraAt(GetWorld(), GameVFX::LoadUpgradeBurstSystem(), Defender->GetActorLocation() + FVector(0.f, 0.f, 80.f));
 }

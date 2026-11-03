@@ -8,6 +8,7 @@
 #include "EnemyBase.h"
 #include "CentralTowerBase.h"
 #include "WorldHealthBar.h"
+#include "GameVFX.h"
 
 ADefenderBase::ADefenderBase()
 {
@@ -242,13 +243,24 @@ void ADefenderBase::ApplyDamage(float DamageAmount)
 	{
 		bIsDestroyed = true;
 		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+		GameVFX::SpawnNiagaraAt(GetWorld(), GameVFX::LoadDeathDustSystem(), GetActorLocation() + FVector(0.f, 0.f, 60.f));
 		if (DefenderMesh)
 		{
 			DefenderMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			DefenderMesh->SetVisibility(false, true);
+		}
+		if (HealthBarWidget)
+		{
+			HealthBarWidget->SetVisibility(false);
 		}
 		OnDefenderDestroyed.Broadcast(this);
-		SetLifeSpan(0.2f);
+		SetLifeSpan(1.1f);
 	}
+}
+
+void ADefenderBase::ApplyUpgradeVisual()
+{
+	GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadUpgradeGoldMaterial());
 }
 
 bool ADefenderBase::IsDestroyed() const
