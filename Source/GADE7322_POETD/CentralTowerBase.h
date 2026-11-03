@@ -28,6 +28,7 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+	virtual void Tick(float DeltaSeconds) override;
 
 public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -86,9 +87,13 @@ private:
 
 	float HitStrainSpike = 0.f;
 	FTimerHandle StrainDecayTimer;
+	static constexpr float LowHealthStrainThreshold = 0.25f;
 
 	void PlayHitFlash();
 	void UpdateTempleStrain();
+	void SetTempleStrainIntensity(float Intensity);
+	void ClearTempleStrainGlow();
+	void ApplyTempleStrainGlow(float Intensity);
 
 	UFUNCTION()
 	void RestoreHitFlash();

@@ -416,108 +416,121 @@ void AProceduralTerrain::GeneratePathways()
 		}
 	}
 
-	TSet<int32> UsedColumns;
-	TSet<int32> UsedRows;
+	TMap<int32, int32> EdgeLaneCount;
+	TMap<int32, TSet<int32>> UsedSlotsByEdge;
 	static const FColor PathColors[] = { FColor::Red, FColor::Blue, FColor::Yellow, FColor::Cyan, FColor::Magenta, FColor::Orange };
 
-	auto BuildLane = [CenterCell](FIntPoint Start, bool bMoveXFirst) -> TArray<FIntPoint>
+	auto AppendStraight = [](TArray<FIntPoint>& Cells, FIntPoint From, FIntPoint To)
 	{
-		TArray<FIntPoint> Cells;
-		Cells.Add(Start);
-		FIntPoint Current = Start;
-		const int32 Axes[2] = { bMoveXFirst ? 0 : 1, bMoveXFirst ? 1 : 0 };
-		for (int32 Axis : Axes)
+		FIntPoint Current = From;
+		while (Current != To)
 		{
-			while ((Axis == 0 && Current.X != CenterCell.X) || (Axis == 1 && Current.Y != CenterCell.Y))
+			if (Current.X != To.X)
 			{
-				if (Axis == 0)
+				Current.X += FMath::Sign(To.X - Current.X);
+			}
+			else if (Current.Y != To.Y)
+			{
+				Current.Y += FMath::Sign(To.Y - Current.Y);
+			}
+			else
+			{
+				break;
+			}
+			Cells.Add(Current);
+		}
+	};
+
+	auto PickOffset = [this, &CenterCell, &UsedSlotsByEdge](int32 Edge, bool bHorizontalEdge, int32 LaneOnEdge) -> int32
+	{
+		const TSet<int32>& UsedSlots = UsedSlotsByEdge.FindOrAdd(Edge);
+		TArray<int32, TInlineAllocator<8>> Candidates;
+		if (LaneOnEdge == 0)
+		{
+			Candidates.Add(0);
+		}
+		for (int32 Step = 1; Step <= 4; ++Step)
+		{
+			Candidates.Add(Step);
+			Candidates.Add(-Step);
+		}
+		if (LaneOnEdge > 0)
+		{
+			Candidates.Add(0);
+		}
+
+		for (const int32 Offset : Candidates)
+		{
+			if (bHorizontalEdge)
+			{
+				const int32 Column = CenterCell.X + Offset;
+				if (Column >= 0 && Column < GridWidth && !UsedSlots.Contains(Column))
 				{
-					Current.X += FMath::Sign(CenterCell.X - Current.X);
+					return Offset;
 				}
-				else
+			}
+			else
+			{
+				const int32 Row = CenterCell.Y + Offset;
+				if (Row >= 0 && Row < GridHeight && !UsedSlots.Contains(Row))
 				{
-					Current.Y += FMath::Sign(CenterCell.Y - Current.Y);
+					return Offset;
 				}
-				Cells.Add(Current);
 			}
 		}
-		if (Cells.Last() != CenterCell)
-		{
-			Cells.Add(CenterCell);
-		}
-		return Cells;
+
+		return 0;
 	};
 
 	for (int32 PathIndex = 0; PathIndex < NumPathways; ++PathIndex)
 	{
 		const int32 Edge = Edges[PathIndex];
 		const bool bHorizontalEdge = (Edge == 0 || Edge == 1);
-		const bool bMoveXFirst = !bHorizontalEdge;
+		const int32 LaneOnEdge = EdgeLaneCount.FindRef(Edge);
+		EdgeLaneCount.FindOrAdd(Edge) = LaneOnEdge + 1;
 
-		TArray<int32> Slots;
-		const int32 SlotCount = bHorizontalEdge ? GridWidth : GridHeight;
-		Slots.Reserve(SlotCount);
-		for (int32 Slot = 0; Slot < SlotCount; ++Slot)
-		{
-			Slots.Add(Slot);
-		}
-		for (int32 i = Slots.Num() - 1; i > 0; --i)
-		{
-			const int32 j = RandomStream.RandRange(0, i);
-			Slots.Swap(i, j);
-		}
-
-		TArray<FIntPoint> Cells;
-		for (int32 Slot : Slots)
-		{
-			if (bHorizontalEdge)
-			{
-				if (Slot == CenterCell.X || UsedColumns.Contains(Slot))
-				{
-					continue;
-				}
-			}
-			else if (Slot == CenterCell.Y || UsedRows.Contains(Slot))
-			{
-				continue;
-			}
-
-			FIntPoint Start;
-			switch (Edge)
-			{
-			case 0: Start = FIntPoint(Slot, 0); break;
-			case 1: Start = FIntPoint(Slot, GridHeight - 1); break;
-			case 2: Start = FIntPoint(0, Slot); break;
-			default: Start = FIntPoint(GridWidth - 1, Slot); break;
-			}
-
-			Cells = BuildLane(Start, bMoveXFirst);
-			break;
-		}
-
-		if (Cells.Num() == 0)
-		{
-			const int32 Fallback = bHorizontalEdge
-				? (CenterCell.X == 0 ? 1 : 0)
-				: (CenterCell.Y == 0 ? 1 : 0);
-			FIntPoint Start;
-			switch (Edge)
-			{
-			case 0: Start = FIntPoint(Fallback, 0); break;
-			case 1: Start = FIntPoint(Fallback, GridHeight - 1); break;
-			case 2: Start = FIntPoint(0, Fallback); break;
-			default: Start = FIntPoint(GridWidth - 1, Fallback); break;
-			}
-			Cells = BuildLane(Start, bMoveXFirst);
-		}
-
+		int32 Offset = PickOffset(Edge, bHorizontalEdge, LaneOnEdge);
 		if (bHorizontalEdge)
 		{
-			UsedColumns.Add(Cells[0].X);
+			const int32 Column = FMath::Clamp(CenterCell.X + Offset, 0, GridWidth - 1);
+			Offset = Column - CenterCell.X;
+			UsedSlotsByEdge.FindOrAdd(Edge).Add(Column);
 		}
 		else
 		{
-			UsedRows.Add(Cells[0].Y);
+			const int32 Row = FMath::Clamp(CenterCell.Y + Offset, 0, GridHeight - 1);
+			Offset = Row - CenterCell.Y;
+			UsedSlotsByEdge.FindOrAdd(Edge).Add(Row);
+		}
+
+		FIntPoint Start;
+		FIntPoint Mid;
+		switch (Edge)
+		{
+		case 0:
+			Start = FIntPoint(CenterCell.X + Offset, 0);
+			Mid = FIntPoint(CenterCell.X + Offset, CenterCell.Y);
+			break;
+		case 1:
+			Start = FIntPoint(CenterCell.X + Offset, GridHeight - 1);
+			Mid = FIntPoint(CenterCell.X + Offset, CenterCell.Y);
+			break;
+		case 2:
+			Start = FIntPoint(0, CenterCell.Y + Offset);
+			Mid = FIntPoint(CenterCell.X, CenterCell.Y + Offset);
+			break;
+		default:
+			Start = FIntPoint(GridWidth - 1, CenterCell.Y + Offset);
+			Mid = FIntPoint(CenterCell.X, CenterCell.Y + Offset);
+			break;
+		}
+
+		TArray<FIntPoint> Cells;
+		Cells.Add(Start);
+		AppendStraight(Cells, Start, Mid);
+		if (Mid != CenterCell)
+		{
+			AppendStraight(Cells, Mid, CenterCell);
 		}
 
 		FProceduralPathway NewPath;
@@ -721,6 +734,25 @@ void AProceduralTerrain::SpawnPathTiles()
 			}
 			Yaw = YawForDirection(InDir) + PathTileYawOffset;
 			TileISM = PickTurnISM(CrossZ);
+		}
+		else if (NeighborDirs.Num() == 3 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
+		{
+			FIntPoint Missing(0, 0);
+			for (const FIntPoint& Dir : Cardinals)
+			{
+				if (!NeighborDirs.Contains(Dir))
+				{
+					Missing = Dir;
+					break;
+				}
+			}
+			Yaw = YawForDirection(Missing) + PathTileYawOffset;
+			TileISM = TJunctionTileISM;
+		}
+		else if (NeighborDirs.Num() >= 4 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
+		{
+			Yaw = PathTileYawOffset;
+			TileISM = TJunctionTileISM;
 		}
 		else
 		{

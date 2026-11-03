@@ -7,6 +7,7 @@
 #include "ProceduralTerrain.h"
 #include "Kismet/GameplayStatics.h"
 #include "TDGameInstance.h"
+#include "WeatherManager.h"
 #include "GameVFX.h"
 
 ADefenderBog::ADefenderBog()
@@ -168,9 +169,18 @@ void ADefenderBog::ScanAndAttack()
 	PulledEnemy = nullptr;
 	bIsDigesting = true;
 
-	UE_LOG(LogTemp, Log, TEXT("Bog %s ate %s. Digesting for %.0f seconds."), *GetName(), *Enemy->GetName(), DigestDuration);
+	float EffectiveDigest = DigestDuration;
+	if (const AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		if (Weather->IsRainy())
+		{
+			EffectiveDigest = FMath::Max(1.f, DigestDuration - 5.f);
+		}
+	}
 
-	GetWorldTimerManager().SetTimer(DigestTimerHandle, this, &ADefenderBog::FinishDigesting, DigestDuration, false);
+	UE_LOG(LogTemp, Log, TEXT("Bog %s ate %s. Digesting for %.0f seconds."), *GetName(), *Enemy->GetName(), EffectiveDigest);
+
+	GetWorldTimerManager().SetTimer(DigestTimerHandle, this, &ADefenderBog::FinishDigesting, EffectiveDigest, false);
 }
 
 void ADefenderBog::FinishDigesting()

@@ -14,7 +14,8 @@
 
 ACentralTowerBase::ACentralTowerBase()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bStartWithTickEnabled = false;
 
 	TowerMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("TowerMesh"));
 	RootComponent = TowerMesh;
@@ -224,9 +225,12 @@ void ACentralTowerBase::ApplyDamage(float DamageAmount)
 	CurrentHealth = FMath::Clamp(CurrentHealth - DamageAmount, 0.f, MaxHealth);
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 	PlayHitFlash();
-	HitStrainSpike = 0.45f;
+	if (GetHealthPercent() <= LowHealthStrainThreshold)
+	{
+		HitStrainSpike = 0.35f;
+		GetWorldTimerManager().SetTimer(StrainDecayTimer, this, &ACentralTowerBase::DecayHitStrain, 0.08f, true);
+	}
 	UpdateTempleStrain();
-	GetWorldTimerManager().SetTimer(StrainDecayTimer, this, &ACentralTowerBase::DecayHitStrain, 0.08f, true);
 
 	if (CurrentHealth <= 0.f)
 	{
@@ -237,16 +241,88 @@ void ACentralTowerBase::ApplyDamage(float DamageAmount)
 	}
 }
 
-void ACentralTowerBase::UpdateTempleStrain()
+void ACentralTowerBase::ClearTempleStrainGlow()
 {
-	const float Strain = FMath::Clamp((1.f - GetHealthPercent()) * 0.85f + HitStrainSpike, 0.f, 1.f);
 	if (TempleStrainMID)
 	{
-		TempleStrainMID->SetScalarParameterValue(TEXT("Intensity"), Strain);
+		TempleStrainMID->SetScalarParameterValue(TEXT("Intensity"), 0.f);
 	}
 	if (TempleStrainPP)
 	{
-		TempleStrainPP->BlendWeight = Strain;
+		TempleStrainPP->BlendWeight = 0.f;
+		TempleStrainPP->Settings = FPostProcessSettings();
+		if (TempleStrainMID)
+		{
+			FWeightedBlendable Blendable;
+			Blendable.Object = TempleStrainMID;
+			Blendable.Weight = 1.f;
+			TempleStrainPP->Settings.WeightedBlendables.Array.Add(Blendable);
+		}
+	}
+}
+
+void ACentralTowerBase::ApplyTempleStrainGlow(float Intensity)
+{
+	const float Clamped = FMath::Clamp(Intensity, 0.f, 1.f);
+	if (TempleStrainMID)
+	{
+		TempleStrainMID->SetScalarParameterValue(TEXT("Intensity"), Clamped);
+	}
+	if (!TempleStrainPP)
+	{
+		return;
+	}
+
+	TempleStrainPP->BlendWeight = FMath::Clamp(0.55f + Clamped * 0.45f, 0.f, 1.f);
+	FPostProcessSettings& Settings = TempleStrainPP->Settings;
+	Settings.WeightedBlendables.Array.Reset();
+	if (TempleStrainMID)
+	{
+		FWeightedBlendable Blendable;
+		Blendable.Object = TempleStrainMID;
+		Blendable.Weight = 1.f;
+		Settings.WeightedBlendables.Array.Add(Blendable);
+	}
+
+	Settings.bOverride_VignetteIntensity = true;
+	Settings.VignetteIntensity = 0.55f + Clamped * 0.4f;
+	Settings.bOverride_SceneColorTint = true;
+	Settings.SceneColorTint = FLinearColor(1.f, 0.35f + (1.f - Clamped) * 0.35f, 0.35f + (1.f - Clamped) * 0.35f);
+	Settings.bOverride_ColorGain = true;
+	Settings.ColorGain = FVector4(1.f + Clamped * 0.35f, 0.75f, 0.75f, 1.f);
+	Settings.bOverride_ColorSaturation = true;
+	Settings.ColorSaturation = FVector4(1.05f, 0.85f, 0.85f, 1.f);
+}
+
+void ACentralTowerBase::SetTempleStrainIntensity(float Intensity)
+{
+	ApplyTempleStrainGlow(Intensity);
+}
+
+void ACentralTowerBase::UpdateTempleStrain()
+{
+	if (GetHealthPercent() > LowHealthStrainThreshold)
+	{
+		HitStrainSpike = 0.f;
+		GetWorldTimerManager().ClearTimer(StrainDecayTimer);
+		ClearTempleStrainGlow();
+		SetActorTickEnabled(false);
+		return;
+	}
+
+	SetActorTickEnabled(true);
+	const float TimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	const float Pulse = 0.6f + 0.4f * FMath::Sin(TimeSeconds * 4.5f);
+	const float Strain = FMath::Clamp(Pulse * 0.9f + HitStrainSpike, 0.f, 1.f);
+	ApplyTempleStrainGlow(Strain);
+}
+
+void ACentralTowerBase::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	if (GetHealthPercent() <= LowHealthStrainThreshold)
+	{
+		UpdateTempleStrain();
 	}
 }
 

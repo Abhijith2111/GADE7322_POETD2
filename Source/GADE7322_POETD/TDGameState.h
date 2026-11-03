@@ -5,6 +5,7 @@
 #include "TDGameState.generated.h"
 
 class ACentralTowerBase;
+class AWeatherManager;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMoneyChanged, int32, NewAmount);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnMoneyTransaction, int32, Amount, int32, NewTotal);
@@ -50,10 +51,19 @@ public:
 	UFUNCTION(BlueprintPure, Category = "UI")
 	ACentralTowerBase* GetCentralTower() const;
 
+	UFUNCTION(BlueprintCallable, Category = "Weather")
+	void RegisterWeatherManager(AWeatherManager* InWeather);
+
+	UFUNCTION(BlueprintPure, Category = "Weather")
+	AWeatherManager* GetWeatherManager() const;
+
 protected:
 	virtual void BeginPlay() override;
 
 private:
 	UPROPERTY()
 	TWeakObjectPtr<ACentralTowerBase> CentralTowerRef;
+
+	UPROPERTY()
+	TWeakObjectPtr<AWeatherManager> WeatherManagerRef;
 };

@@ -11,6 +11,7 @@
 
 class UButton;
 class UUpgradeMenuWidget;
+class UWeatherStatusWidget;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementFailed, FString, Reason);
@@ -140,6 +141,9 @@ private:
 	UPROPERTY()
 	UUpgradeMenuWidget* UpgradeMenuInstance;
 
+	UPROPERTY()
+	UWeatherStatusWidget* WeatherStatusInstance;
+
 	TWeakObjectPtr<ADefenderBase> SelectedUpgradeTarget;
 	bool bUpgradeCameraActive = false;
 
@@ -148,6 +152,11 @@ private:
 
 	void SetPausedState(bool bPause);
 	void EnsureWidgetClasses();
+	void ShowWeatherStatus();
+	void HideWeatherStatus();
+
+	UFUNCTION()
+	void RetryBindWeatherStatus();
 
 	UFUNCTION()
 	void HandleGameLoss();
@@ -175,6 +184,7 @@ private:
 	bool IsFarEnoughFromPathways(const FVector& Location) const;
 
 	FTimerHandle OverviewCameraHandle;
+	FTimerHandle WeatherStatusBindHandle;
 	int32 OverviewCameraAttempts = 0;
 
 	UFUNCTION()

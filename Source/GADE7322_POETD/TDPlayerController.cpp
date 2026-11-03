@@ -16,7 +16,9 @@
 #include "DefenderMineShaft.h"
 #include "EnemySpawner.h"
 #include "UpgradeMenuWidget.h"
+#include "WeatherStatusWidget.h"
 #include "GameVFX.h"
+#include "WeatherManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
 #include "Components/PanelWidget.h"
@@ -122,6 +124,13 @@ void ATDPlayerController::BeginPlay()
 		}
 	}
 
+	WeatherStatusInstance = CreateWidget<UWeatherStatusWidget>(this, UWeatherStatusWidget::StaticClass());
+	if (WeatherStatusInstance)
+	{
+		WeatherStatusInstance->AddToViewport(1);
+		WeatherStatusInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+
 	if (ATDGameMode* GM = Cast<ATDGameMode>(UGameplayStatics::GetGameMode(this)))
 	{
 		GM->OnLoss.AddDynamic(this, &ATDPlayerController::HandleGameLoss);
@@ -134,6 +143,10 @@ void ATDPlayerController::BeginPlay()
 	if (bOpenOnMenu)
 	{
 		ShowMainMenu();
+	}
+	else
+	{
+		ShowWeatherStatus();
 	}
 }
 
@@ -370,6 +383,8 @@ void ATDPlayerController::StartMatchFromMenu(ETDDifficulty Difficulty)
 			Spawner->StartSpawning();
 		}
 	}
+
+	ShowWeatherStatus();
 }
 
 void ATDPlayerController::ReturnToMainMenu()
@@ -378,6 +393,11 @@ void ATDPlayerController::ReturnToMainMenu()
 	if (!World)
 	{
 		return;
+	}
+
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		Weather->StopWeatherCycle();
 	}
 
 	if (AWorldSettings* Settings = World->GetWorldSettings())
@@ -454,6 +474,7 @@ void ATDPlayerController::ShowMainMenu()
 	{
 		HUDInstance->SetVisibility(ESlateVisibility::Collapsed);
 	}
+	HideWeatherStatus();
 
 	bInMainMenu = true;
 	bIsPaused = true;
@@ -580,8 +601,64 @@ void ATDPlayerController::HandleGameVictory()
 	ShowGameOver(true);
 }
 
+void ATDPlayerController::ShowWeatherStatus()
+{
+	if (!WeatherStatusInstance)
+	{
+		WeatherStatusInstance = CreateWidget<UWeatherStatusWidget>(this, UWeatherStatusWidget::StaticClass());
+		if (WeatherStatusInstance)
+		{
+			WeatherStatusInstance->AddToViewport(1);
+		}
+	}
+	if (!WeatherStatusInstance)
+	{
+		return;
+	}
+
+	WeatherStatusInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		WeatherStatusInstance->BindToWeather(Weather);
+		GetWorldTimerManager().ClearTimer(WeatherStatusBindHandle);
+	}
+	else if (GetWorld())
+	{
+		GetWorldTimerManager().SetTimer(WeatherStatusBindHandle, this, &ATDPlayerController::RetryBindWeatherStatus, 0.1f, true);
+	}
+}
+
+void ATDPlayerController::HideWeatherStatus()
+{
+	GetWorldTimerManager().ClearTimer(WeatherStatusBindHandle);
+	if (WeatherStatusInstance)
+	{
+		WeatherStatusInstance->UnbindFromWeather();
+		WeatherStatusInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+}
+
+void ATDPlayerController::RetryBindWeatherStatus()
+{
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		if (WeatherStatusInstance)
+		{
+			WeatherStatusInstance->BindToWeather(Weather);
+			WeatherStatusInstance->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		GetWorldTimerManager().ClearTimer(WeatherStatusBindHandle);
+	}
+}
+
 void ATDPlayerController::ShowGameOver(bool bVictory)
 {
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		Weather->StopWeatherCycle();
+	}
+	HideWeatherStatus();
+
 	SetPause(true);
 	bIsPaused = true;
 
