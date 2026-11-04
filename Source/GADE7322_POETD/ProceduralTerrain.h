@@ -99,6 +99,9 @@ public:
 	UInstancedStaticMeshComponent* TJunctionTileISM;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
+	UInstancedStaticMeshComponent* CrossTileISM;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UInstancedStaticMeshComponent* GroundTileISM_A;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
@@ -124,6 +127,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|PathTiles")
 	UStaticMesh* TJunctionPathMesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|PathTiles")
+	UStaticMesh* CrossPathMesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Terrain|PathTiles", meta = (ClampMin = "-360.0", ClampMax = "360.0"))
 	float PathTileYawOffset = 0.f;
@@ -218,6 +224,7 @@ private:
 
 	TSet<FIntPoint> PlacedTileCells;
 
+	void ResolvePathMeshes();
 	void SpawnPathTiles();
 	void SpawnGroundTiles();
 	void UpdateVoidPlane();

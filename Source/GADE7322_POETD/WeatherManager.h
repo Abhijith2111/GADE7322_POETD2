@@ -96,8 +96,8 @@ private:
 	float LightningFlash = 0.f;
 	static constexpr float WindVolumeRadius = 3200.f;
 	static constexpr float RainVolumeRadius = 3200.f;
-	static constexpr float RainMinZ = 30.f;
-	static constexpr float RainMaxZ = 900.f;
+	static constexpr float RainMinZ = 40.f;
+	static constexpr float RainMaxZ = 1100.f;
 
 	void ScheduleNextWeatherChange();
 	void RollNextWeather();
@@ -112,6 +112,7 @@ private:
 	FVector MakeWindStreakSpawnLocation(bool bUpwindEdge) const;
 	void BuildRainDrops();
 	void SetRainVisible(bool bVisible);
+	void ResetRainDropPositions();
 	void UpdateRainDrops(float DeltaSeconds);
 	FVector MakeRainDropSpawnLocation(bool bAtTop) const;
 	void RefreshWeatherTickState();

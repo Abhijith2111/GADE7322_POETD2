@@ -369,6 +369,31 @@ namespace
 		return SaveAssetPackage(Material);
 	}
 
+	bool BuildRainDropMaterial()
+	{
+		UMaterial* Material = CreateMaterialAsset(TEXT("M_RainDrop"));
+		if (!Material)
+		{
+			return false;
+		}
+
+		Material->BlendMode = BLEND_Translucent;
+		Material->SetShadingModel(MSM_Unlit);
+		Material->TwoSided = true;
+
+		UMaterialExpressionConstant3Vector* Tint = Cast<UMaterialExpressionConstant3Vector>(Expr(Material, UMaterialExpressionConstant3Vector::StaticClass(), -200, 0));
+		Tint->Constant = FLinearColor(0.7f, 0.85f, 1.f);
+		ConnectProp(Tint, TEXT(""), MP_EmissiveColor);
+
+		UMaterialExpressionConstant* Opacity = Cast<UMaterialExpressionConstant>(Expr(Material, UMaterialExpressionConstant::StaticClass(), -200, 120));
+		Opacity->R = 0.7f;
+		ConnectProp(Opacity, TEXT(""), MP_Opacity);
+
+		UMaterialEditingLibrary::LayoutMaterialExpressions(Material);
+		UMaterialEditingLibrary::RecompileMaterial(Material);
+		return SaveAssetPackage(Material);
+	}
+
 	void AssignSpriteMaterial(UNiagaraSystem* System, UMaterialInterface* SpriteMaterial)
 	{
 		if (!System || !SpriteMaterial)
@@ -435,6 +460,7 @@ int32 UGenerateVFXAssetsCommandlet::Main(const FString& Params)
 	bOk &= BuildParticleSpriteMaterial(TEXT("M_GoldParticle"), FLinearColor(1.f, 0.9f, 0.15f));
 	bOk &= BuildParticleSpriteMaterial(TEXT("M_DustParticle"), FLinearColor(0.45f, 0.35f, 0.22f));
 	bOk &= BuildWindStreakMaterial();
+	bOk &= BuildRainDropMaterial();
 
 	UMaterialInterface* GoldSprite = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_GoldParticle.M_GoldParticle"));
 	UMaterialInterface* DustSprite = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_DustParticle.M_DustParticle"));

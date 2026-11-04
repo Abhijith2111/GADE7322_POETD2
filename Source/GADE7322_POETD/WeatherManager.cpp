@@ -178,6 +178,7 @@ void AWeatherManager::ApplyWeather(EWeatherType NewWeather)
 	else if (CurrentWeather == EWeatherType::Rainy)
 	{
 		SetWindStreaksVisible(false);
+		ResetRainDropPositions();
 		SetRainVisible(true);
 	}
 	else
@@ -450,26 +451,38 @@ void AWeatherManager::UpdateWindStreaks(float DeltaSeconds)
 
 FVector AWeatherManager::MakeRainDropSpawnLocation(bool bAtTop) const
 {
+	const FVector Origin = GetActorLocation();
 	const float Angle = FMath::FRandRange(0.f, 2.f * PI);
 	const float Radius = FMath::FRandRange(0.f, RainVolumeRadius);
 	const float Height = bAtTop
-		? FMath::FRandRange(RainMaxZ - 80.f, RainMaxZ)
-		: FMath::FRandRange(200.f, RainMaxZ);
-	return FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Height);
+		? FMath::FRandRange(RainMaxZ - 120.f, RainMaxZ)
+		: FMath::FRandRange(180.f, RainMaxZ);
+	return Origin + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Height);
 }
 
 void AWeatherManager::BuildRainDrops()
 {
-	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	UMaterialInterface* RainMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_WindStreak.M_WindStreak"));
-	UMaterialInterface* FallbackMat = Sphere ? Sphere->GetMaterial(0) : nullptr;
+	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UMaterialInterface* RainMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_RainDrop.M_RainDrop"));
+	if (!RainMat)
+	{
+		RainMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_WindStreak.M_WindStreak"));
+	}
+	UMaterialInterface* FallbackMat = Cube ? Cube->GetMaterial(0) : nullptr;
 	UMaterialInterface* UseMat = RainMat ? RainMat : FallbackMat;
-	const FLinearColor DropColor(0.7f, 0.82f, 0.95f, 1.f);
+	const FLinearColor DropColor(0.75f, 0.88f, 1.f, 1.f);
 
+	for (UStaticMeshComponent* Existing : RainDropMeshes)
+	{
+		if (Existing)
+		{
+			Existing->DestroyComponent();
+		}
+	}
 	RainDropMeshes.Reset();
 	RainDropData.Reset();
 
-	for (int32 Index = 0; Index < 70; ++Index)
+	for (int32 Index = 0; Index < 140; ++Index)
 	{
 		UStaticMeshComponent* Drop = NewObject<UStaticMeshComponent>(this);
 		Drop->SetupAttachment(Root);
@@ -477,33 +490,34 @@ void AWeatherManager::BuildRainDrops()
 		Drop->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		Drop->SetCastShadow(false);
 		Drop->SetAbsolute(true, true, true);
-		if (Sphere)
+		Drop->SetHiddenInGame(false);
+		if (Cube)
 		{
-			Drop->SetStaticMesh(Sphere);
+			Drop->SetStaticMesh(Cube);
 		}
 
 		FRainDropData Data;
-		Data.FallSpeed = FMath::FRandRange(700.f, 1400.f);
-		Data.DriftX = FMath::FRandRange(-40.f, 40.f);
-		Data.DriftY = FMath::FRandRange(-40.f, 40.f);
+		Data.FallSpeed = FMath::FRandRange(850.f, 1600.f);
+		Data.DriftX = FMath::FRandRange(-80.f, 80.f);
+		Data.DriftY = FMath::FRandRange(-80.f, 80.f);
 
-		const FVector SpawnLoc = MakeRainDropSpawnLocation(false);
-		const float Thickness = FMath::FRandRange(0.04f, 0.09f);
-		const float Length = FMath::FRandRange(0.35f, 0.75f);
+		const float Thickness = FMath::FRandRange(0.18f, 0.4f);
+		const float Length = FMath::FRandRange(2.8f, 6.5f);
 		Drop->SetWorldScale3D(FVector(Thickness, Thickness, Length));
-		Drop->SetWorldLocation(SpawnLoc);
+		Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
+		Drop->SetWorldLocation(MakeRainDropSpawnLocation(false));
 		if (UseMat)
 		{
 			if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(UseMat, this))
 			{
 				DynMat->SetVectorParameterValue(TEXT("Color"), DropColor);
 				DynMat->SetVectorParameterValue(TEXT("BaseColor"), DropColor);
-				DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), DropColor * 1.8f);
-				DynMat->SetScalarParameterValue(TEXT("Opacity"), 0.28f);
+				DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), DropColor * 6.f);
+				DynMat->SetScalarParameterValue(TEXT("Opacity"), 0.65f);
 				Drop->SetMaterial(0, DynMat);
 			}
 		}
-		Drop->SetVisibility(false);
+		Drop->SetVisibility(false, true);
 		RainDropMeshes.Add(Drop);
 		RainDropData.Add(Data);
 	}
@@ -515,7 +529,29 @@ void AWeatherManager::SetRainVisible(bool bVisible)
 	{
 		if (Drop)
 		{
+			Drop->SetHiddenInGame(!bVisible);
 			Drop->SetVisibility(bVisible, true);
+		}
+	}
+}
+
+void AWeatherManager::ResetRainDropPositions()
+{
+	for (int32 Index = 0; Index < RainDropMeshes.Num(); ++Index)
+	{
+		UStaticMeshComponent* Drop = RainDropMeshes[Index];
+		if (!Drop)
+		{
+			continue;
+		}
+
+		Drop->SetWorldLocation(MakeRainDropSpawnLocation(false));
+		Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
+		if (Index < RainDropData.Num())
+		{
+			RainDropData[Index].FallSpeed = FMath::FRandRange(850.f, 1600.f);
+			RainDropData[Index].DriftX = FMath::FRandRange(-80.f, 80.f);
+			RainDropData[Index].DriftY = FMath::FRandRange(-80.f, 80.f);
 		}
 	}
 }
@@ -539,6 +575,7 @@ void AWeatherManager::UpdateRainDrops(float DeltaSeconds)
 		if (Location.Z < RainMinZ)
 		{
 			Location = MakeRainDropSpawnLocation(true);
+			Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
 		}
 
 		Drop->SetWorldLocation(Location);

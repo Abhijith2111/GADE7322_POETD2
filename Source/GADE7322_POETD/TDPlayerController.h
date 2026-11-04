@@ -10,6 +10,7 @@
 #include "TDPlayerController.generated.h"
 
 class UButton;
+class UDifficultyBriefingWidget;
 class UUpgradeMenuWidget;
 class UWeatherStatusWidget;
 
@@ -111,6 +112,9 @@ public:
 	void StartMatchFromMenu(ETDDifficulty Difficulty);
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
+	void ConfirmDifficultyBriefing();
+
+	UFUNCTION(BlueprintCallable, Category = "UI")
 	void ReturnToMainMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -140,6 +144,9 @@ private:
 
 	UPROPERTY()
 	UUpgradeMenuWidget* UpgradeMenuInstance;
+
+	UPROPERTY()
+	UDifficultyBriefingWidget* DifficultyBriefingInstance;
 
 	UPROPERTY()
 	UWeatherStatusWidget* WeatherStatusInstance;

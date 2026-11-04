@@ -50,6 +50,7 @@ AProceduralTerrain::AProceduralTerrain()
 	TurnLeftTileISM = MakeTileISM(TEXT("TurnLeftTileISM"));
 	TurnRightTileISM = MakeTileISM(TEXT("TurnRightTileISM"));
 	TJunctionTileISM = MakeTileISM(TEXT("TJunctionTileISM"));
+	CrossTileISM = MakeTileISM(TEXT("CrossTileISM"));
 
 	GroundTileISM_A = MakeTileISM(TEXT("GroundTileISM_A"));
 	GroundTileISM_B = MakeTileISM(TEXT("GroundTileISM_B"));
@@ -126,6 +127,8 @@ void AProceduralTerrain::GenerateTerrain()
 	GridWidth = FMath::Max(GridWidth, 4);
 	GridHeight = FMath::Max(GridHeight, 4);
 	NumPathways = bUseMatchLaneCount ? FMath::Clamp(MatchLaneCount, 3, 5) : 3;
+
+	ResolvePathMeshes();
 
 	if (bAutoDetectTileDimensions)
 	{
@@ -623,6 +626,35 @@ void AProceduralTerrain::DrawDebugVisualization()
 		DebugSphereRadius * 2.f, 12, FColor::White, true, -1.f, 0, 3.f);
 }
 
+void AProceduralTerrain::ResolvePathMeshes()
+{
+	auto LoadNamed = [](const TCHAR* Path) -> UStaticMesh*
+	{
+		return LoadObject<UStaticMesh>(nullptr, Path);
+	};
+
+	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_StraightPath.SM_StraightPath")))
+	{
+		StraightPathMesh = Mesh;
+	}
+	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathLeft.SM_PathLeft")))
+	{
+		TurnLeftPathMesh = Mesh;
+	}
+	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathRight.SM_PathRight")))
+	{
+		TurnRightPathMesh = Mesh;
+	}
+	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathTJunction.SM_PathTJunction")))
+	{
+		TJunctionPathMesh = Mesh;
+	}
+	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/Path_Cross_.Path_Cross_")))
+	{
+		CrossPathMesh = Mesh;
+	}
+}
+
 float AProceduralTerrain::YawForDirection(const FIntPoint& Dir) const
 {
 	if (Dir.X == 1) return 0.f;
@@ -665,21 +697,28 @@ void AProceduralTerrain::SpawnTileInstance(UInstancedStaticMeshComponent* ISM, c
 
 void AProceduralTerrain::SpawnPathTiles()
 {
+	ResolvePathMeshes();
+
 	StraightTileISM->ClearInstances();
 	TurnLeftTileISM->ClearInstances();
 	TurnRightTileISM->ClearInstances();
 	TJunctionTileISM->ClearInstances();
+	if (CrossTileISM)
+	{
+		CrossTileISM->ClearInstances();
+	}
 
 	if (StraightPathMesh) StraightTileISM->SetStaticMesh(StraightPathMesh);
 	if (TurnLeftPathMesh) TurnLeftTileISM->SetStaticMesh(TurnLeftPathMesh);
 	if (TurnRightPathMesh) TurnRightTileISM->SetStaticMesh(TurnRightPathMesh);
 	if (TJunctionPathMesh) TJunctionTileISM->SetStaticMesh(TJunctionPathMesh);
+	if (CrossPathMesh && CrossTileISM) CrossTileISM->SetStaticMesh(CrossPathMesh);
 
 	PlacedTileCells.Empty();
 
 	static const FIntPoint Cardinals[] = { FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1) };
 	const float PathZ = FMath::Max(PathTileZOffset, GroundTileZOffset + 4.f);
-	constexpr float PathFit = 0.995f;
+	constexpr float PathFit = 1.f;
 
 	auto PickTurnISM = [this](int32 CrossZ) -> UInstancedStaticMeshComponent*
 	{
@@ -718,7 +757,7 @@ void AProceduralTerrain::SpawnPathTiles()
 		else if (NeighborDirs.Num() == 1 ||
 			(NeighborDirs.Num() == 2 && NeighborDirs[0] + NeighborDirs[1] == FIntPoint(0, 0)))
 		{
-			Yaw = YawForDirection(NeighborDirs[0]) + PathTileYawOffset;
+			Yaw = YawForDirection(NeighborDirs[0]) + 90.f + PathTileYawOffset;
 			TileISM = StraightTileISM;
 		}
 		else if (NeighborDirs.Num() == 2)
@@ -732,7 +771,7 @@ void AProceduralTerrain::SpawnPathTiles()
 				OutDir = NeighborDirs[0];
 				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
 			}
-			Yaw = YawForDirection(InDir) + PathTileYawOffset;
+			Yaw = YawForDirection(InDir) + 90.f + PathTileYawOffset;
 			TileISM = PickTurnISM(CrossZ);
 		}
 		else if (NeighborDirs.Num() == 3 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
@@ -746,13 +785,13 @@ void AProceduralTerrain::SpawnPathTiles()
 					break;
 				}
 			}
-			Yaw = YawForDirection(Missing) + PathTileYawOffset;
+			Yaw = YawForDirection(Missing) - 90.f + PathTileYawOffset;
 			TileISM = TJunctionTileISM;
 		}
-		else if (NeighborDirs.Num() >= 4 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
+		else if (NeighborDirs.Num() >= 4 && CrossTileISM && CrossTileISM->GetStaticMesh())
 		{
 			Yaw = PathTileYawOffset;
-			TileISM = TJunctionTileISM;
+			TileISM = CrossTileISM;
 		}
 		else
 		{
@@ -781,7 +820,7 @@ void AProceduralTerrain::SpawnPathTiles()
 				OutDir = DirA;
 				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
 			}
-			Yaw = YawForDirection(InDir) + PathTileYawOffset;
+			Yaw = YawForDirection(InDir) + 90.f + PathTileYawOffset;
 			TileISM = PickTurnISM(CrossZ);
 		}
 

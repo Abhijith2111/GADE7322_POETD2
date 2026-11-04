@@ -16,6 +16,7 @@
 #include "DefenderMineShaft.h"
 #include "EnemySpawner.h"
 #include "UpgradeMenuWidget.h"
+#include "DifficultyBriefingWidget.h"
 #include "WeatherStatusWidget.h"
 #include "GameVFX.h"
 #include "WeatherManager.h"
@@ -347,6 +348,50 @@ void ATDPlayerController::StartMatchFromMenu(ETDDifficulty Difficulty)
 		MainMenuInstance = nullptr;
 	}
 
+	if (HUDInstance)
+	{
+		HUDInstance->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	HideWeatherStatus();
+
+	bIsPaused = true;
+	SetPause(true);
+
+	if (!DifficultyBriefingInstance)
+	{
+		DifficultyBriefingInstance = CreateWidget<UDifficultyBriefingWidget>(this, UDifficultyBriefingWidget::StaticClass());
+		if (DifficultyBriefingInstance)
+		{
+			DifficultyBriefingInstance->AddToViewport(110);
+		}
+	}
+	if (DifficultyBriefingInstance)
+	{
+		DifficultyBriefingInstance->ShowForDifficulty(Difficulty, this);
+	}
+
+	FInputModeUIOnly InputMode;
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	if (DifficultyBriefingInstance)
+	{
+		InputMode.SetWidgetToFocus(DifficultyBriefingInstance->TakeWidget());
+	}
+	SetInputMode(InputMode);
+	bShowMouseCursor = true;
+	if (APawn* ControlledPawn = GetPawn())
+	{
+		ControlledPawn->DisableInput(this);
+	}
+}
+
+void ATDPlayerController::ConfirmDifficultyBriefing()
+{
+	if (DifficultyBriefingInstance)
+	{
+		DifficultyBriefingInstance->RemoveFromParent();
+		DifficultyBriefingInstance = nullptr;
+	}
+
 	if (UWorld* World = GetWorld())
 	{
 		if (AWorldSettings* Settings = World->GetWorldSettings())
@@ -357,6 +402,7 @@ void ATDPlayerController::StartMatchFromMenu(ETDDifficulty Difficulty)
 	}
 	SetPause(false);
 	bIsPaused = false;
+	bInMainMenu = false;
 
 	FInputModeGameAndUI InputMode;
 	InputMode.SetHideCursorDuringCapture(false);
@@ -423,6 +469,11 @@ void ATDPlayerController::ReturnToMainMenu()
 	{
 		MainMenuInstance->RemoveFromParent();
 		MainMenuInstance = nullptr;
+	}
+	if (DifficultyBriefingInstance)
+	{
+		DifficultyBriefingInstance->RemoveFromParent();
+		DifficultyBriefingInstance = nullptr;
 	}
 
 	FInputModeGameAndUI InputMode;
