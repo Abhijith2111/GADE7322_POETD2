@@ -31,8 +31,11 @@ protected:
 	AActor* FindNearestTarget() const;
 	void SeatMeshOnPivot();
 	void SnapToGround();
+	void RefreshMeshPlacementAfterSwap();
 
 public:
+	virtual void ApplyUpgradeVisual();
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* DefenderMesh;
 
@@ -68,8 +71,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const;
-
-	void ApplyUpgradeVisual();
 
 private:
 	bool bIsDestroyed = false;

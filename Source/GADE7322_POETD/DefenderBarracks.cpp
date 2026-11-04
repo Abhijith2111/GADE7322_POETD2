@@ -228,3 +228,18 @@ void ADefenderBarracks::ApplyTrainUpgrade()
 	KnightTrainInterval = FMath::Max(1.f, KnightTrainInterval - 3.f);
 	RefreshTrainingForWeather(true);
 }
+
+void ADefenderBarracks::ApplyUpgradeVisual()
+{
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/BarracksT2.BarracksT2")))
+	{
+		DefenderMesh->SetStaticMesh(UpgradeMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+		RefreshMeshPlacementAfterSwap();
+	}
+}

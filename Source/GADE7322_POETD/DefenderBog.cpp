@@ -192,3 +192,18 @@ void ADefenderBog::ApplyDigestUpgrade()
 {
 	DigestDuration = FMath::Max(1.f, DigestDuration - 3.f);
 }
+
+void ADefenderBog::ApplyUpgradeVisual()
+{
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/SpireT2.SpireT2")))
+	{
+		DefenderMesh->SetStaticMesh(UpgradeMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+		RefreshMeshPlacementAfterSwap();
+	}
+}

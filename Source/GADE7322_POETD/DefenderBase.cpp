@@ -345,9 +345,74 @@ void ADefenderBase::ApplyDamage(float DamageAmount)
 	}
 }
 
+void ADefenderBase::RefreshMeshPlacementAfterSwap()
+{
+	const FVector LockedLocation = GetActorLocation();
+	SeatMeshOnPivot();
+
+	UWorld* World = GetWorld();
+	if (World && DefenderMesh)
+	{
+		const FVector TraceStart(LockedLocation.X, LockedLocation.Y, LockedLocation.Z + 2500.f);
+		const FVector TraceEnd(LockedLocation.X, LockedLocation.Y, LockedLocation.Z - 5000.f);
+
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(DefenderUpgradeGroundSnap), true, this);
+		Params.AddIgnoredActor(this);
+
+		TArray<AActor*> IgnoreActors;
+		UGameplayStatics::GetAllActorsOfClass(World, ADefenderBase::StaticClass(), IgnoreActors);
+		Params.AddIgnoredActors(IgnoreActors);
+		TArray<AActor*> Towers;
+		UGameplayStatics::GetAllActorsOfClass(World, ACentralTowerBase::StaticClass(), Towers);
+		Params.AddIgnoredActors(Towers);
+		TArray<AActor*> Enemies;
+		UGameplayStatics::GetAllActorsOfClass(World, AEnemyBase::StaticClass(), Enemies);
+		Params.AddIgnoredActors(Enemies);
+
+		float NewZ = LockedLocation.Z;
+		if (World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_Visibility, Params)
+			|| World->LineTraceSingleByChannel(Hit, TraceStart, TraceEnd, ECC_WorldStatic, Params))
+		{
+			const FBox LocalBox = DefenderMesh->GetStaticMesh()
+				? DefenderMesh->GetStaticMesh()->GetBoundingBox()
+				: FBox(FVector::ZeroVector, FVector::ZeroVector);
+			const float BottomZ = LocalBox.Min.Z * DefenderMesh->GetComponentScale().Z;
+			NewZ = Hit.ImpactPoint.Z - BottomZ + 16.f;
+		}
+
+		SetActorLocation(FVector(LockedLocation.X, LockedLocation.Y, NewZ));
+	}
+	else
+	{
+		SetActorLocation(LockedLocation);
+	}
+
+	if (DefenderMesh && DefenderMesh->GetStaticMesh() && HealthBarWidget)
+	{
+		const FBox LocalBounds = DefenderMesh->GetStaticMesh()->GetBoundingBox();
+		const float ScaleZ = FMath::Max(DefenderMesh->GetComponentScale().Z, KINDA_SMALL_NUMBER);
+		const FVector BarOffset(
+			(LocalBounds.Min.X + LocalBounds.Max.X) * 0.5f,
+			(LocalBounds.Min.Y + LocalBounds.Max.Y) * 0.5f,
+			LocalBounds.Max.Z + (24.f / ScaleZ));
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, BarOffset, FVector2D(140.f, 18.f));
+	}
+}
+
 void ADefenderBase::ApplyUpgradeVisual()
 {
-	GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadUpgradeGoldMaterial());
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT2.ArcherTowerT2")))
+	{
+		DefenderMesh->SetStaticMesh(UpgradeMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+		RefreshMeshPlacementAfterSwap();
+	}
 }
 
 bool ADefenderBase::IsDestroyed() const
