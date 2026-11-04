@@ -1,5 +1,6 @@
 #include "TDGameState.h"
 #include "CentralTowerBase.h"
+#include "WeatherManager.h"
 
 ATDGameState::ATDGameState()
 {
@@ -69,4 +70,14 @@ void ATDGameState::RegisterCentralTower(ACentralTowerBase* InTower)
 ACentralTowerBase* ATDGameState::GetCentralTower() const
 {
 	return CentralTowerRef.Get();
+}
+
+void ATDGameState::RegisterWeatherManager(AWeatherManager* InWeather)
+{
+	WeatherManagerRef = InWeather;
+}
+
+AWeatherManager* ATDGameState::GetWeatherManager() const
+{
+	return WeatherManagerRef.Get();
 }

@@ -16,6 +16,7 @@
 #include "Engine/StaticMesh.h"
 #include "EnemyBrute.h"
 #include "EnemyTrojanHorse.h"
+#include "WeatherManager.h"
 
 AEnemyBase::AEnemyBase()
 {
@@ -491,6 +492,40 @@ void AEnemyBase::ExecuteAttack()
 
 	if (ShouldEngageDefenders())
 	{
+		if (const AWeatherManager* Weather = AWeatherManager::Get(this))
+		{
+			if (Weather->IsNight() && FMath::FRand() < 0.15f)
+			{
+				AEnemyBase* ConfusedTarget = nullptr;
+				float NearestDistSq = FMath::Square(FMath::Max(AttackRange, 250.f));
+				TArray<AActor*> Enemies;
+				UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), Enemies);
+				for (AActor* Actor : Enemies)
+				{
+					AEnemyBase* Other = Cast<AEnemyBase>(Actor);
+					if (!Other || Other == this || Other->IsDefeated())
+					{
+						continue;
+					}
+
+					const float DistSq = FVector::DistSquared(GetActorLocation(), Other->GetActorLocation());
+					if (DistSq <= NearestDistSq)
+					{
+						NearestDistSq = DistSq;
+						ConfusedTarget = Other;
+					}
+				}
+
+				if (ConfusedTarget)
+				{
+					ConfusedTarget->TakeDamageFromDefender(AttackDamage);
+					UE_LOG(LogTemp, Log, TEXT("EnemyBase %s confused and attacked %s for %.1f damage"),
+						*GetName(), *ConfusedTarget->GetName(), AttackDamage);
+					return;
+				}
+			}
+		}
+
 		ADefenderBase* NearestDefender = FindNearestDefender(AttackRange);
 		if (NearestDefender)
 		{

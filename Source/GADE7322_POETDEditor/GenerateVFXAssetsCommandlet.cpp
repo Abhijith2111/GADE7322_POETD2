@@ -344,6 +344,31 @@ namespace
 		return SaveAssetPackage(Material);
 	}
 
+	bool BuildWindStreakMaterial()
+	{
+		UMaterial* Material = CreateMaterialAsset(TEXT("M_WindStreak"));
+		if (!Material)
+		{
+			return false;
+		}
+
+		Material->BlendMode = BLEND_Translucent;
+		Material->SetShadingModel(MSM_Unlit);
+		Material->TwoSided = true;
+
+		UMaterialExpressionConstant3Vector* Tint = Cast<UMaterialExpressionConstant3Vector>(Expr(Material, UMaterialExpressionConstant3Vector::StaticClass(), -200, 0));
+		Tint->Constant = FLinearColor(0.82f, 0.9f, 0.95f);
+		ConnectProp(Tint, TEXT(""), MP_EmissiveColor);
+
+		UMaterialExpressionConstant* Opacity = Cast<UMaterialExpressionConstant>(Expr(Material, UMaterialExpressionConstant::StaticClass(), -200, 120));
+		Opacity->R = 0.22f;
+		ConnectProp(Opacity, TEXT(""), MP_Opacity);
+
+		UMaterialEditingLibrary::LayoutMaterialExpressions(Material);
+		UMaterialEditingLibrary::RecompileMaterial(Material);
+		return SaveAssetPackage(Material);
+	}
+
 	void AssignSpriteMaterial(UNiagaraSystem* System, UMaterialInterface* SpriteMaterial)
 	{
 		if (!System || !SpriteMaterial)
@@ -409,6 +434,7 @@ int32 UGenerateVFXAssetsCommandlet::Main(const FString& Params)
 	bOk &= BuildTempleStrain();
 	bOk &= BuildParticleSpriteMaterial(TEXT("M_GoldParticle"), FLinearColor(1.f, 0.9f, 0.15f));
 	bOk &= BuildParticleSpriteMaterial(TEXT("M_DustParticle"), FLinearColor(0.45f, 0.35f, 0.22f));
+	bOk &= BuildWindStreakMaterial();
 
 	UMaterialInterface* GoldSprite = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_GoldParticle.M_GoldParticle"));
 	UMaterialInterface* DustSprite = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_DustParticle.M_DustParticle"));

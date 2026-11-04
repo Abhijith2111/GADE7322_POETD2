@@ -6,6 +6,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "TimerManager.h"
 #include "TDGameInstance.h"
+#include "WeatherManager.h"
 
 ADefenderBarracks::ADefenderBarracks()
 {
@@ -75,16 +76,90 @@ void ADefenderBarracks::BeginPlay()
 	}
 
 	Super::BeginPlay();
-	SpawnKnights();
 
-	const float Interval = FMath::Max(KnightTrainInterval, 1.f);
-	GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, Interval);
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		Weather->OnWeatherChanged.AddDynamic(this, &ADefenderBarracks::HandleWeatherChanged);
+	}
+
+	RefreshTrainingForWeather(true);
 }
 
 void ADefenderBarracks::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
+	if (AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		Weather->OnWeatherChanged.RemoveDynamic(this, &ADefenderBarracks::HandleWeatherChanged);
+	}
+
 	GetWorldTimerManager().ClearTimer(TrainTimerHandle);
+	GetWorldTimerManager().ClearTimer(InitialSpawnTimerHandle);
 	Super::EndPlay(EndPlayReason);
+}
+
+float ADefenderBarracks::GetEffectiveTrainInterval() const
+{
+	float Interval = KnightTrainInterval;
+	if (const AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		if (Weather->IsNight())
+		{
+			Interval += 5.f;
+		}
+	}
+	return FMath::Max(Interval, 1.f);
+}
+
+void ADefenderBarracks::RefreshTrainingForWeather(bool bAllowInitialSpawn)
+{
+	if (!GetWorld() || IsDestroyed())
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(TrainTimerHandle);
+	GetWorldTimerManager().ClearTimer(InitialSpawnTimerHandle);
+
+	const float Interval = GetEffectiveTrainInterval();
+	const bool bNight = AWeatherManager::Get(this) && AWeatherManager::Get(this)->IsNight();
+
+	if (!bInitialKnightsSpawned)
+	{
+		if (!bAllowInitialSpawn)
+		{
+			return;
+		}
+
+		if (bNight)
+		{
+			GetWorldTimerManager().SetTimer(InitialSpawnTimerHandle, this, &ADefenderBarracks::SpawnInitialKnights, 5.f, false);
+			GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, 5.f + Interval);
+		}
+		else
+		{
+			SpawnInitialKnights();
+			GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, Interval);
+		}
+		return;
+	}
+
+	GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, Interval);
+}
+
+void ADefenderBarracks::SpawnInitialKnights()
+{
+	if (bInitialKnightsSpawned || IsDestroyed())
+	{
+		return;
+	}
+
+	SpawnKnights();
+	bInitialKnightsSpawned = true;
+}
+
+void ADefenderBarracks::HandleWeatherChanged(EWeatherType NewWeather)
+{
+	RefreshTrainingForWeather(true);
 }
 
 void ADefenderBarracks::TrainKnight()
@@ -93,6 +168,11 @@ void ADefenderBarracks::TrainKnight()
 	{
 		GetWorldTimerManager().ClearTimer(TrainTimerHandle);
 		return;
+	}
+
+	if (!bInitialKnightsSpawned)
+	{
+		SpawnInitialKnights();
 	}
 
 	SpawnOneKnight();
@@ -129,20 +209,22 @@ void ADefenderBarracks::SpawnOneKnight()
 	const FVector Offset(FMath::Cos(Angle) * TileSize * 0.55f, FMath::Sin(Angle) * TileSize * 0.55f, 40.f);
 	++TrainedKnightCount;
 
+	TSubclassOf<ADefenderKnight> KnightClass = ADefenderKnight::StaticClass();
+	if (const AWeatherManager* Weather = AWeatherManager::Get(this))
+	{
+		if (Weather->IsNight() && NightKnightClass)
+		{
+			KnightClass = NightKnightClass;
+		}
+	}
+
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	World->SpawnActor<ADefenderKnight>(ADefenderKnight::StaticClass(), GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParams);
+	World->SpawnActor<ADefenderKnight>(KnightClass, GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParams);
 }
 
 void ADefenderBarracks::ApplyTrainUpgrade()
 {
 	KnightTrainInterval = FMath::Max(1.f, KnightTrainInterval - 3.f);
-	if (!GetWorld())
-	{
-		return;
-	}
-
-	GetWorldTimerManager().ClearTimer(TrainTimerHandle);
-	const float Interval = KnightTrainInterval;
-	GetWorldTimerManager().SetTimer(TrainTimerHandle, this, &ADefenderBarracks::TrainKnight, Interval, true, Interval);
+	RefreshTrainingForWeather(true);
 }

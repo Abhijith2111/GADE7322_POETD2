@@ -6,6 +6,7 @@
 #include "EnemyTrojanHorse.h"
 #include "TDGameMode.h"
 #include "TDGameInstance.h"
+#include "WeatherManager.h"
 
 AEnemySpawner::AEnemySpawner()
 {
@@ -78,6 +79,11 @@ void AEnemySpawner::StartSpawning()
 	OpeningGruntsRemaining = GetDifficulty() == ETDDifficulty::Easy ? FMath::RandRange(2, 3) : 0;
 
 	PrepareMatchBoard();
+
+	if (AWeatherManager* Weather = AWeatherManager::Ensure(GetWorld()))
+	{
+		Weather->StartWeatherCycle();
+	}
 
 	if (GetDifficulty() == ETDDifficulty::Hard)
 	{

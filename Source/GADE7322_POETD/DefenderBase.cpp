@@ -9,6 +9,7 @@
 #include "CentralTowerBase.h"
 #include "WorldHealthBar.h"
 #include "GameVFX.h"
+#include "WeatherManager.h"
 
 ADefenderBase::ADefenderBase()
 {
@@ -180,21 +181,107 @@ void ADefenderBase::ScanAndAttack()
 		return;
 	}
 
-	AEnemyBase* Enemy = Cast<AEnemyBase>(Target);
-	if (Enemy)
+	UWorld* World = GetWorld();
+	FVector ShotOrigin = GetActorLocation();
+	if (DefenderMesh)
+	{
+		DefenderMesh->UpdateBounds();
+		ShotOrigin = DefenderMesh->Bounds.Origin;
+	}
+
+	AWeatherManager* Weather = AWeatherManager::Get(this);
+	if (Weather && Weather->IsWindy() && FMath::FRand() < 0.25f)
+	{
+		AActor* StrayTarget = nullptr;
+		if (FMath::FRand() < 0.5f)
+		{
+			const FVector WindDir = Weather->GetWindDirection();
+			float BestScore = 0.25f;
+
+			TArray<AActor*> Enemies;
+			UGameplayStatics::GetAllActorsOfClass(World, AEnemyBase::StaticClass(), Enemies);
+			for (AActor* Actor : Enemies)
+			{
+				AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
+				if (!Enemy || Enemy->IsDefeated() || Actor == Target)
+				{
+					continue;
+				}
+
+				const FVector ToTarget = (Enemy->GetActorLocation() - ShotOrigin).GetSafeNormal2D();
+				const float DistSq = FVector::DistSquared(ShotOrigin, Enemy->GetActorLocation());
+				if (DistSq > FMath::Square(AttackRange))
+				{
+					continue;
+				}
+
+				const float Score = FVector::DotProduct(ToTarget, WindDir);
+				if (Score > BestScore)
+				{
+					BestScore = Score;
+					StrayTarget = Enemy;
+				}
+			}
+
+			TArray<AActor*> Defenders;
+			UGameplayStatics::GetAllActorsOfClass(World, ADefenderBase::StaticClass(), Defenders);
+			for (AActor* Actor : Defenders)
+			{
+				ADefenderBase* Defender = Cast<ADefenderBase>(Actor);
+				if (!Defender || Defender->IsDestroyed() || Defender == this)
+				{
+					continue;
+				}
+
+				const FVector ToTarget = (Defender->GetActorLocation() - ShotOrigin).GetSafeNormal2D();
+				const float DistSq = FVector::DistSquared(ShotOrigin, Defender->GetActorLocation());
+				if (DistSq > FMath::Square(AttackRange))
+				{
+					continue;
+				}
+
+				const float Score = FVector::DotProduct(ToTarget, WindDir);
+				if (Score > BestScore)
+				{
+					BestScore = Score;
+					StrayTarget = Defender;
+				}
+			}
+		}
+
+		if (StrayTarget)
+		{
+			if (AEnemyBase* Enemy = Cast<AEnemyBase>(StrayTarget))
+			{
+				Enemy->TakeDamageFromDefender(AttackDamage);
+			}
+			else if (ADefenderBase* Defender = Cast<ADefenderBase>(StrayTarget))
+			{
+				Defender->ApplyDamage(AttackDamage);
+			}
+
+			if (World)
+			{
+				DrawDebugLine(World, ShotOrigin, StrayTarget->GetActorLocation(), FColor::Orange, false, AttackInterval * 0.5f, 0, 3.f);
+			}
+			return;
+		}
+
+		if (World)
+		{
+			const FVector MissEnd = ShotOrigin + Weather->GetWindDirection() * AttackRange * 0.75f + FVector(0.f, 0.f, 40.f);
+			DrawDebugLine(World, ShotOrigin, MissEnd, FColor::Silver, false, AttackInterval * 0.5f, 0, 2.f);
+		}
+		return;
+	}
+
+	if (AEnemyBase* Enemy = Cast<AEnemyBase>(Target))
 	{
 		Enemy->TakeDamageFromDefender(AttackDamage);
 	}
 
-	UWorld* World = GetWorld();
 	if (World)
 	{
-		FVector ShotOrigin = GetActorLocation();
-		if (DefenderMesh)
-		{
-			DefenderMesh->UpdateBounds();
-			ShotOrigin = DefenderMesh->Bounds.Origin;
-		}
 		DrawDebugLine(World, ShotOrigin, Target->GetActorLocation(), FColor::Red, false, AttackInterval * 0.5f, 0, 3.f);
 	}
 
