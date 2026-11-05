@@ -82,6 +82,9 @@ private:
 	UPROPERTY()
 	TArray<TObjectPtr<UStaticMeshComponent>> RainDropMeshes;
 
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> LightningBolt;
+
 	TArray<FWindStreakData> WindStreakData;
 	TArray<FRainDropData> RainDropData;
 
@@ -94,10 +97,9 @@ private:
 	FTimerHandle LightningFlashTimer;
 
 	float LightningFlash = 0.f;
-	static constexpr float WindVolumeRadius = 3200.f;
-	static constexpr float RainVolumeRadius = 3200.f;
 	static constexpr float RainMinZ = 40.f;
 	static constexpr float RainMaxZ = 1100.f;
+	static constexpr int32 WindStreakCount = 140;
 
 	void ScheduleNextWeatherChange();
 	void RollNextWeather();
@@ -109,6 +111,8 @@ private:
 	void SetWindStreaksVisible(bool bVisible);
 	void RefreshWindStreakOrientations();
 	void UpdateWindStreaks(float DeltaSeconds);
+	void GetBoardBounds(FVector& OutMin, FVector& OutMax) const;
+	void GetWindSpan(float& OutMinAlong, float& OutMaxAlong, float& OutMinAcross, float& OutMaxAcross) const;
 	FVector MakeWindStreakSpawnLocation(bool bUpwindEdge) const;
 	void BuildRainDrops();
 	void SetRainVisible(bool bVisible);
@@ -124,4 +128,6 @@ private:
 	void ClearLightningFlash();
 
 	void StrikeLightning();
+	void ShowLightningBolt(const FVector& GroundPoint);
+	void HideLightningBolt();
 };

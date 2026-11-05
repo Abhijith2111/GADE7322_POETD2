@@ -82,7 +82,7 @@ AEnemyBase* ADefenderKnight::FindPriorityTarget() const
 	for (AActor* Actor : FoundEnemies)
 	{
 		AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
-		if (!Enemy || Enemy->IsDefeated() || Enemy->IsBeingEaten())
+		if (!Enemy || Enemy->IsDefeated() || Enemy->IsBeingEaten() || Enemy->IsBogAlly())
 		{
 			continue;
 		}

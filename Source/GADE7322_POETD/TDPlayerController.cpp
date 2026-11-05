@@ -1049,19 +1049,73 @@ int32 ATDPlayerController::GetUpgradeCostFor(const ADefenderBase* Defender) cons
 	return 100;
 }
 
+int32 ATDPlayerController::GetMaxUpgradeLevel(const ADefenderBase* Defender) const
+{
+	if (!Defender)
+	{
+		return 1;
+	}
+	if (Defender->IsA(ADefenderBog::StaticClass()) || Defender->IsA(ADefenderBarracks::StaticClass()))
+	{
+		return 3;
+	}
+	if (IsArcherDefender(Defender))
+	{
+		return 2;
+	}
+	return 1;
+}
+
+bool ATDPlayerController::IsArcherDefender(const ADefenderBase* Defender) const
+{
+	return Defender
+		&& !Defender->IsA(ADefenderBog::StaticClass())
+		&& !Defender->IsA(ADefenderBarracks::StaticClass())
+		&& !Defender->IsA(ADefenderKnight::StaticClass())
+		&& !Defender->IsA(ADefenderMineShaft::StaticClass());
+}
+
 FText ATDPlayerController::GetUpgradeBonusText(const ADefenderBase* Defender) const
 {
 	if (!Defender)
 	{
 		return FText::GetEmpty();
 	}
+
+	const int32* LevelPtr = DefenderUpgradeLevels.Find(Defender);
+	const int32 Level = LevelPtr ? *LevelPtr : 0;
+	if (Level >= GetMaxUpgradeLevel(Defender))
+	{
+		return NSLOCTEXT("Upgrade", "FullyUpgraded", "Fully upgraded");
+	}
+
 	if (Defender->IsA(ADefenderBog::StaticClass()))
 	{
-		return NSLOCTEXT("Upgrade", "BogBonus", "Level 1: digestion 3 seconds faster");
+		if (Level <= 0)
+		{
+			return NSLOCTEXT("Upgrade", "BogBonus", "Level 1: digestion 3 seconds faster");
+		}
+		if (Level == 1)
+		{
+			return NSLOCTEXT("Upgrade", "BogBonus2", "Level 2: digestion 5 seconds faster");
+		}
+		return NSLOCTEXT("Upgrade", "BogBonus3", "Level 3: +50 health. 30% chance an eaten enemy becomes an ally.");
 	}
 	if (Defender->IsA(ADefenderBarracks::StaticClass()))
 	{
-		return NSLOCTEXT("Upgrade", "BarracksBonus", "Level 1: knights train 3 seconds faster");
+		if (Level <= 0)
+		{
+			return NSLOCTEXT("Upgrade", "BarracksBonus", "Level 1: knights train 3 seconds faster");
+		}
+		if (Level == 1)
+		{
+			return NSLOCTEXT("Upgrade", "BarracksBonus2", "Level 2: knights train 3 seconds faster, and new knights hit for 1 more damage");
+		}
+		return NSLOCTEXT("Upgrade", "BarracksBonus3", "Level 3: new knights hit for 2 more damage and have 50 more health");
+	}
+	if (IsArcherDefender(Defender) && Level == 1)
+	{
+		return NSLOCTEXT("Upgrade", "ArcherChoice", "Choose one. Health and attack speed, or attack power.");
 	}
 	return NSLOCTEXT("Upgrade", "ArcherBonus", "Level 1: +20 health and +5 damage");
 }
@@ -1172,7 +1226,14 @@ void ATDPlayerController::RefreshUpgradeMenu()
 
 	const int32* LevelPtr = DefenderUpgradeLevels.Find(Defender);
 	const int32 Level = LevelPtr ? *LevelPtr : 0;
-	UpgradeMenuInstance->ShowForDefender(Defender, GetUpgradeCostFor(Defender), Level, GetUpgradeBonusText(Defender));
+	const int32 MaxLevel = GetMaxUpgradeLevel(Defender);
+	UpgradeMenuInstance->ShowForDefender(
+		Defender,
+		GetUpgradeCostFor(Defender),
+		Level,
+		MaxLevel,
+		IsArcherDefender(Defender) && Level == 1,
+		GetUpgradeBonusText(Defender));
 }
 
 void ATDPlayerController::CloseUpgradeMenu()
@@ -1193,6 +1254,16 @@ void ATDPlayerController::CloseUpgradeMenu()
 
 void ATDPlayerController::ConfirmSelectedUpgrade()
 {
+	ApplyChosenUpgrade(0);
+}
+
+void ATDPlayerController::ConfirmArcherPowerUpgrade()
+{
+	ApplyChosenUpgrade(1);
+}
+
+void ATDPlayerController::ApplyChosenUpgrade(int32 Choice)
+{
 	ADefenderBase* Defender = SelectedUpgradeTarget.Get();
 	if (!Defender || !IsUpgradableDefender(Defender))
 	{
@@ -1205,7 +1276,7 @@ void ATDPlayerController::ConfirmSelectedUpgrade()
 		OnDefenderPlacementFailed.Broadcast(TEXT("Clicked defender not tracked."));
 		return;
 	}
-	if (*LevelPtr >= 1)
+	if (*LevelPtr >= GetMaxUpgradeLevel(Defender))
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("No further upgrades."));
 		RefreshUpgradeMenu();
@@ -1220,26 +1291,66 @@ void ATDPlayerController::ConfirmSelectedUpgrade()
 	}
 
 	SpendMoney(Cost);
+	const int32 NextLevel = *LevelPtr + 1;
 
 	if (ADefenderBog* Bog = Cast<ADefenderBog>(Defender))
 	{
-		Bog->ApplyDigestUpgrade();
+		if (NextLevel <= 1)
+		{
+			Bog->ApplyDigestUpgrade();
+		}
+		else if (NextLevel == 2)
+		{
+			Bog->ApplyFastDigestUpgrade();
+		}
+		else
+		{
+			Bog->ApplyConvertUpgrade();
+		}
 	}
 	else if (ADefenderBarracks* Barracks = Cast<ADefenderBarracks>(Defender))
 	{
-		Barracks->ApplyTrainUpgrade();
+		if (NextLevel <= 1)
+		{
+			Barracks->ApplyTrainUpgrade();
+		}
+		else if (NextLevel == 2)
+		{
+			Barracks->ApplyProductionUpgrade();
+		}
+		else
+		{
+			Barracks->ApplyTroopUpgrade();
+		}
 	}
-	else
+	else if (NextLevel <= 1)
 	{
 		Defender->MaxHealth += 20.f;
 		Defender->CurrentHealth = FMath::Min(Defender->CurrentHealth + 20.f, Defender->MaxHealth);
 		Defender->AttackDamage += 5.f;
+		Defender->OnHealthChanged.Broadcast(Defender->CurrentHealth, Defender->MaxHealth);
+	}
+	else if (Choice == 0)
+	{
+		Defender->MaxHealth += 30.f;
+		Defender->CurrentHealth = FMath::Min(Defender->CurrentHealth + 30.f, Defender->MaxHealth);
+		Defender->OnHealthChanged.Broadcast(Defender->CurrentHealth, Defender->MaxHealth);
+		Defender->AttackInterval = FMath::Max(0.4f, Defender->AttackInterval - 0.25f);
+		Defender->RestartAttackTimer();
+	}
+	else
+	{
+		Defender->AttackDamage += 10.f;
 	}
 
-	*LevelPtr = 1;
-	Defender->ApplyUpgradeVisual();
+	if (NextLevel == 1)
+	{
+		Defender->ApplyUpgradeVisual();
+	}
+
+	*LevelPtr = NextLevel;
 	PlayUpgradeSparkle(Defender);
-	OnDefenderUpgraded.Broadcast(Defender, 1);
+	OnDefenderUpgraded.Broadcast(Defender, NextLevel);
 	RefreshUpgradeMenu();
 }
 

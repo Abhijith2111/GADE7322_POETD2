@@ -52,7 +52,12 @@ namespace
 			"- Archer: ranged tower that shoots enemies on the path.\n"
 			"- Barracks: trains knights that fight nearby threats.\n"
 			"- Bog: pulls in and digests enemies (place off the path).\n"
-			"- Mine: support building. Upgrade Archer, Barracks, or Bog once for stronger stats.\n\n");
+			"- Mine: support building.\n\n"
+			"Upgrades\n"
+			"Click a placed archer, barracks, or bog to open its upgrade menu. Each purchase spends coins. Archers cost 100, barracks cost 150, and bogs cost 200. Later upgrades cost the same amount. Mines and knights cannot be upgraded.\n"
+			"- Archer: the first upgrade adds 20 health and 5 damage, and changes the tower's look. The next upgrade is a choice, and you can pick only one. Health and attack speed adds 30 health and makes the tower shoot faster. Attack power adds 10 damage.\n"
+			"- Barracks: the first upgrade trains knights 3 seconds faster and changes the building's look. The next trains 3 seconds faster again, and new knights deal 1 more damage. The last adds 2 more damage and 50 health to knights trained after that upgrade.\n"
+			"- Bog: the first upgrade digests 3 seconds faster and changes the building's look. The next digests 5 seconds faster. The last adds 50 health, and gives a 30% chance that an eaten enemy becomes an ally that fights other attackers until it is defeated.\n\n");
 
 		const FText Weather = NSLOCTEXT(
 			"Briefing",
@@ -60,7 +65,7 @@ namespace
 			"\n\nWeather\n"
 			"Weather changes every 45 to 90 seconds. The current weather is shown at the top right.\n"
 			"- Sunny: no extra effect on attackers or defenders.\n"
-			"- Raining: the sky turns grey and rain falls. Bogs finish digesting 5 seconds sooner.\n"
+			"- Raining: the sky turns grey and rain falls. Bogs finish digesting 5 seconds sooner. On every difficulty, lightning can strike a random attacker or a random defender and defeat them.\n"
 			"- Night: the map goes dark. Barracks take 5 seconds longer to train each knight. An attacker fighting your defenders sometimes strikes another attacker instead.\n"
 			"- Windy: wind crosses the map. About one in four archer shots goes astray and can hit another enemy, one of your own defenders, or miss.");
 

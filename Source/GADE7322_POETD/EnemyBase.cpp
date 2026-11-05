@@ -172,6 +172,113 @@ bool AEnemyBase::IsBeingEaten() const
 	return bIsBeingEaten;
 }
 
+void AEnemyBase::ConvertToBogAlly()
+{
+	bIsBogAlly = true;
+	bIsBeingEaten = false;
+	BogPullTarget = nullptr;
+	EngagedAlly = nullptr;
+	bIsAttacking = false;
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->SetMovementMode(MOVE_Walking);
+		Movement->bRunPhysicsWithNoController = true;
+	}
+}
+
+AEnemyBase* AEnemyBase::FindNearestHostile(float Range) const
+{
+	TArray<AActor*> Enemies;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), Enemies);
+
+	AEnemyBase* Nearest = nullptr;
+	float NearestDistSq = FMath::Square(Range);
+	for (AActor* Actor : Enemies)
+	{
+		AEnemyBase* Other = Cast<AEnemyBase>(Actor);
+		if (!Other || Other == this || Other->IsDefeated() || Other->IsBogAlly() || Other->IsBeingEaten())
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared2D(GetActorLocation(), Other->GetActorLocation());
+		if (DistSq <= NearestDistSq)
+		{
+			NearestDistSq = DistSq;
+			Nearest = Other;
+		}
+	}
+
+	return Nearest;
+}
+
+AEnemyBase* AEnemyBase::FindNearestBogAlly(float Range) const
+{
+	if (bIsBogAlly)
+	{
+		return nullptr;
+	}
+
+	TArray<AActor*> Enemies;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), Enemies);
+
+	AEnemyBase* Nearest = nullptr;
+	float NearestDistSq = FMath::Square(Range);
+	for (AActor* Actor : Enemies)
+	{
+		AEnemyBase* Other = Cast<AEnemyBase>(Actor);
+		if (!Other || Other == this || Other->IsDefeated() || !Other->IsBogAlly())
+		{
+			continue;
+		}
+
+		const float DistSq = FVector::DistSquared2D(GetActorLocation(), Other->GetActorLocation());
+		if (DistSq <= NearestDistSq)
+		{
+			NearestDistSq = DistSq;
+			Nearest = Other;
+		}
+	}
+
+	return Nearest;
+}
+
+bool AEnemyBase::UpdateBogAllyBehavior()
+{
+	if (!bIsBogAlly)
+	{
+		return false;
+	}
+
+	EngagedAlly = nullptr;
+	AEnemyBase* Chase = FindNearestHostile(AggroRange);
+	AEnemyBase* Strike = FindNearestHostile(AttackRange);
+	if (Chase && !Strike)
+	{
+		AddMovementInput((Chase->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+	}
+	SetCombatActive(Strike != nullptr);
+	return true;
+}
+
+void AEnemyBase::SetCombatActive(bool bActive)
+{
+	if (bActive)
+	{
+		if (!bIsAttacking)
+		{
+			bIsAttacking = true;
+			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
+		}
+	}
+	else if (bIsAttacking)
+	{
+		bIsAttacking = false;
+		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	}
+}
+
 void AEnemyBase::UpdateBogPull(float DeltaTime)
 {
 	if (!BogPullTarget.IsValid())
@@ -271,14 +378,36 @@ FVector AEnemyBase::SteerAroundFights(const FVector& DesiredDir) const
 
 void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
 {
+	if (UpdateBogAllyBehavior())
+	{
+		return;
+	}
+
 	ACentralTowerBase* Tower = FindCentralTower();
 	const bool bTowerInRange = IsTowerInAttackRange(Tower);
 
 	if (ShouldEngageDefenders())
 	{
+		AEnemyBase* AllyAggro = FindNearestBogAlly(AggroRange);
+		AEnemyBase* AllyAttack = FindNearestBogAlly(AttackRange);
 		ADefenderBase* AggroDefender = FindNearestDefender(AggroRange);
 		ADefenderBase* AttackDefender = FindNearestDefender(AttackRange);
+		const float AllyDist = AllyAggro ? FVector::DistSquared2D(GetActorLocation(), AllyAggro->GetActorLocation()) : BIG_NUMBER;
+		const float DefenderDist = AggroDefender ? FVector::DistSquared2D(GetActorLocation(), AggroDefender->GetActorLocation()) : BIG_NUMBER;
 
+		if (AllyAggro && AllyDist <= DefenderDist)
+		{
+			EngagedAlly = AllyAggro;
+			DrawDebugLine(GetWorld(), GetActorLocation(), AllyAggro->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
+			SetCombatActive(AllyAttack != nullptr);
+			if (!AllyAttack)
+			{
+				AddMovementInput((AllyAggro->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+			}
+			return;
+		}
+
+		EngagedAlly = nullptr;
 		if (AggroDefender)
 		{
 			DrawDebugLine(GetWorld(), GetActorLocation(), AggroDefender->GetActorLocation(), FColor::Orange, false, 0.1f, 0, 3.f);
@@ -291,6 +420,10 @@ void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
 			}
 			return;
 		}
+	}
+	else
+	{
+		EngagedAlly = nullptr;
 	}
 
 	if (bTowerInRange)
@@ -361,20 +494,7 @@ void AEnemyBase::FollowPath(float DeltaTime)
 
 void AEnemyBase::UpdateCombatState(ADefenderBase* AttackTarget, bool bCanAttackTower)
 {
-	const bool bShouldAttack = AttackTarget != nullptr || bCanAttackTower;
-	if (bShouldAttack)
-	{
-		if (!bIsAttacking)
-		{
-			bIsAttacking = true;
-			GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &AEnemyBase::ExecuteAttack, AttackInterval, true, 0.f);
-		}
-	}
-	else if (bIsAttacking)
-	{
-		bIsAttacking = false;
-		GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-	}
+	SetCombatActive(AttackTarget != nullptr || bCanAttackTower);
 }
 
 ADefenderBase* AEnemyBase::FindNearestDefender(float Range) const
@@ -490,6 +610,24 @@ void AEnemyBase::ExecuteAttack()
 		return;
 	}
 
+	if (bIsBogAlly)
+	{
+		if (AEnemyBase* Hostile = FindNearestHostile(AttackRange))
+		{
+			Hostile->TakeDamageFromDefender(AttackDamage);
+		}
+		return;
+	}
+
+	if (AEnemyBase* Ally = EngagedAlly.Get())
+	{
+		if (!Ally->IsDefeated() && FVector::DistSquared2D(GetActorLocation(), Ally->GetActorLocation()) <= FMath::Square(AttackRange))
+		{
+			Ally->TakeDamageFromDefender(AttackDamage);
+			return;
+		}
+	}
+
 	if (ShouldEngageDefenders())
 	{
 		if (const AWeatherManager* Weather = AWeatherManager::Get(this))
@@ -503,7 +641,7 @@ void AEnemyBase::ExecuteAttack()
 				for (AActor* Actor : Enemies)
 				{
 					AEnemyBase* Other = Cast<AEnemyBase>(Actor);
-					if (!Other || Other == this || Other->IsDefeated())
+					if (!Other || Other == this || Other->IsDefeated() || Other->IsBogAlly())
 					{
 						continue;
 					}

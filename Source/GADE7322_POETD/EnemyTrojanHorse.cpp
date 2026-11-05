@@ -102,6 +102,11 @@ bool AEnemyTrojanHorse::ShouldBypassFights() const
 
 void AEnemyTrojanHorse::UpdateMovementAndCombat(float DeltaTime)
 {
+	if (UpdateBogAllyBehavior())
+	{
+		return;
+	}
+
 	ACentralTowerBase* Tower = FindCentralTower();
 	if (IsTowerInAttackRange(Tower) || CurrentWaypointIndex >= Waypoints.Num())
 	{

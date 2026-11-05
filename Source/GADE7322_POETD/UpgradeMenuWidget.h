@@ -16,7 +16,7 @@ class GADE7322_POETD_API UUpgradeMenuWidget : public UUserWidget
 
 public:
 	void BindController(ATDPlayerController* InController);
-	void ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, const FText& BonusText);
+	void ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText);
 
 	virtual bool Initialize() override;
 
@@ -25,6 +25,9 @@ protected:
 
 	UFUNCTION()
 	void HandleUpgradeClicked();
+
+	UFUNCTION()
+	void HandlePowerClicked();
 
 	UFUNCTION()
 	void HandleCloseClicked();
@@ -42,6 +45,15 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<UButton> UpgradeButton;
+
+	UPROPERTY()
+	TObjectPtr<UButton> PowerButton;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> UpgradeButtonLabel;
+
+	UPROPERTY()
+	TObjectPtr<UTextBlock> PowerButtonLabel;
 
 	UPROPERTY()
 	TObjectPtr<UButton> CloseButton;

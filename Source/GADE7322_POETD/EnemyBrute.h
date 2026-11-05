@@ -24,6 +24,7 @@ protected:
 
 private:
 	TSet<TWeakObjectPtr<ADefenderBase>> DamagedDefenders;
+	TSet<TWeakObjectPtr<AEnemyBase>> DamagedAllies;
 
 	void ApplyPassByDamage();
 };

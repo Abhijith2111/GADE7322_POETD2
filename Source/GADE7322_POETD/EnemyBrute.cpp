@@ -89,6 +89,11 @@ bool AEnemyBrute::ShouldBypassFights() const
 
 void AEnemyBrute::UpdateMovementAndCombat(float DeltaTime)
 {
+	if (UpdateBogAllyBehavior())
+	{
+		return;
+	}
+
 	ApplyPassByDamage();
 
 	ACentralTowerBase* Tower = FindCentralTower();
@@ -128,6 +133,23 @@ void AEnemyBrute::ApplyPassByDamage()
 			Defender->ApplyDamage(AttackDamage);
 			DamagedDefenders.Add(Defender);
 			UE_LOG(LogTemp, Log, TEXT("Brute %s pass-hit Defender %s for %.1f"), *GetName(), *Defender->GetName(), AttackDamage);
+		}
+	}
+
+	TArray<AActor*> Enemies;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AEnemyBase::StaticClass(), Enemies);
+	for (AActor* Actor : Enemies)
+	{
+		AEnemyBase* Ally = Cast<AEnemyBase>(Actor);
+		if (!Ally || Ally == this || !Ally->IsBogAlly() || Ally->IsDefeated() || DamagedAllies.Contains(Ally))
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared2D(SelfLoc, Ally->GetActorLocation()) <= RangeSq)
+		{
+			Ally->TakeDamageFromDefender(AttackDamage);
+			DamagedAllies.Add(Ally);
 		}
 	}
 }

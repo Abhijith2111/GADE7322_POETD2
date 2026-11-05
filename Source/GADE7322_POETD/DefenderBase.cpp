@@ -299,7 +299,7 @@ AActor* ADefenderBase::FindNearestTarget() const
 	for (AActor* Actor : FoundEnemies)
 	{
 		AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
-		if (!Enemy || Enemy->IsDefeated())
+		if (!Enemy || Enemy->IsDefeated() || Enemy->IsBogAlly())
 		{
 			continue;
 		}
@@ -313,6 +313,18 @@ AActor* ADefenderBase::FindNearestTarget() const
 	}
 
 	return Nearest;
+}
+
+void ADefenderBase::RestartAttackTimer()
+{
+	if (!GetWorld() || bIsDestroyed)
+	{
+		return;
+	}
+
+	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
+	const float Interval = FMath::Max(AttackInterval, 0.05f);
+	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ADefenderBase::ScanAndAttack, Interval, true, Interval);
 }
 
 void ADefenderBase::ApplyDamage(float DamageAmount)

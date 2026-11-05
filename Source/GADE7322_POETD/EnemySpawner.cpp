@@ -228,7 +228,7 @@ int32 AEnemySpawner::CountLiving(TSubclassOf<AEnemyBase> Class) const
 	for (AActor* Actor : Found)
 	{
 		const AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
-		if (Enemy && !Enemy->IsDefeated())
+		if (Enemy && !Enemy->IsDefeated() && !Enemy->IsBogAlly())
 		{
 			++Count;
 		}

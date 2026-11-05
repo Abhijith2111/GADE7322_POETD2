@@ -15,6 +15,8 @@ class GADE7322_POETD_API ADefenderBarracks : public ADefenderBase
 public:
 	ADefenderBarracks();
 	void ApplyTrainUpgrade();
+	void ApplyProductionUpgrade();
+	void ApplyTroopUpgrade();
 
 protected:
 	virtual void BeginPlay() override;
@@ -46,6 +48,9 @@ protected:
 	void HandleWeatherChanged(EWeatherType NewWeather);
 
 	void SpawnOneKnight();
+
+	float KnightDamageBonus = 0.f;
+	float KnightHealthBonus = 0.f;
 
 	FTimerHandle TrainTimerHandle;
 	FTimerHandle InitialSpawnTimerHandle;

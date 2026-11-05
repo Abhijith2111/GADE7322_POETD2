@@ -88,6 +88,9 @@ public:
 	void ConfirmSelectedUpgrade();
 
 	UFUNCTION(BlueprintCallable, Category = "Upgrade")
+	void ConfirmArcherPowerUpgrade();
+
+	UFUNCTION(BlueprintCallable, Category = "Upgrade")
 	void CloseUpgradeMenu();
 
 	UFUNCTION(BlueprintCallable, Category = "UI")
@@ -202,7 +205,10 @@ private:
 	void OpenUpgradeMenu(ADefenderBase* Defender);
 	bool IsUpgradableDefender(const ADefenderBase* Defender) const;
 	int32 GetUpgradeCostFor(const ADefenderBase* Defender) const;
+	int32 GetMaxUpgradeLevel(const ADefenderBase* Defender) const;
+	bool IsArcherDefender(const ADefenderBase* Defender) const;
 	FText GetUpgradeBonusText(const ADefenderBase* Defender) const;
+	void ApplyChosenUpgrade(int32 Choice);
 	int32 GetBogCap() const;
 	int32 CountLivingBogs() const;
 	bool IsBogCapReached() const;

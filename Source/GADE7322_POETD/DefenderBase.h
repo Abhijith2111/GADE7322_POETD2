@@ -67,6 +67,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void ApplyDamage(float DamageAmount);
 
+	void RestartAttackTimer();
+
 	UFUNCTION(BlueprintPure, Category = "Health")
 	bool IsDestroyed() const;
 

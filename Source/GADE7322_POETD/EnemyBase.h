@@ -79,6 +79,8 @@ public:
 	void BeginBogPull(AActor* Bog);
 	bool IsBeingEaten() const;
 	bool IsEngagedInFight() const;
+	bool IsBogAlly() const { return bIsBogAlly; }
+	void ConvertToBogAlly();
 
 protected:
 	TArray<FVector> Waypoints;
@@ -86,9 +88,11 @@ protected:
 	bool bIsDefeated = false;
 	bool bIsAttacking = false;
 	bool bIsBeingEaten = false;
+	bool bIsBogAlly = false;
 	bool bWaypointsInitialised = false;
 
 	TWeakObjectPtr<AActor> BogPullTarget;
+	TWeakObjectPtr<AEnemyBase> EngagedAlly;
 
 	FTimerHandle AttackTimerHandle;
 	FTimerHandle HitFlashTimer;
@@ -115,6 +119,10 @@ protected:
 	virtual void FollowPath(float DeltaTime);
 	virtual void HandleDeath();
 	void UpdateBogPull(float DeltaTime);
+	bool UpdateBogAllyBehavior();
+	void SetCombatActive(bool bActive);
+	AEnemyBase* FindNearestHostile(float Range) const;
+	AEnemyBase* FindNearestBogAlly(float Range) const;
 
 	ADefenderBase* FindNearestDefender(float Range) const;
 	ACentralTowerBase* FindCentralTower() const;

@@ -123,6 +123,7 @@ void AWeatherManager::StopWeatherCycle()
 	GetWorldTimerManager().ClearTimer(LightningTimer);
 	GetWorldTimerManager().ClearTimer(LightningFlashTimer);
 	LightningFlash = 0.f;
+	HideLightningBolt();
 	CurrentWeather = EWeatherType::Sunny;
 	SetStarsVisible(false);
 	SetWindStreaksVisible(false);
@@ -167,6 +168,7 @@ void AWeatherManager::ApplyWeather(EWeatherType NewWeather)
 	GetWorldTimerManager().ClearTimer(LightningTimer);
 	GetWorldTimerManager().ClearTimer(LightningFlashTimer);
 	LightningFlash = 0.f;
+	HideLightningBolt();
 
 	if (CurrentWeather == EWeatherType::Windy)
 	{
@@ -315,15 +317,62 @@ void AWeatherManager::SetStarsVisible(bool bVisible)
 	}
 }
 
+void AWeatherManager::GetBoardBounds(FVector& OutMin, FVector& OutMax) const
+{
+	OutMin = FVector(0.f, 0.f, 0.f);
+	OutMax = FVector(4000.f, 4000.f, 0.f);
+	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
+	{
+		const FVector First = Terrain->GridToWorldLocation(0, 0);
+		const FVector Last = Terrain->GridToWorldLocation(FMath::Max(Terrain->GridWidth - 1, 0), FMath::Max(Terrain->GridHeight - 1, 0));
+		const FVector Half(Terrain->TileDimensions.X * 0.5f, Terrain->TileDimensions.Y * 0.5f, 0.f);
+		OutMin = FVector(FMath::Min(First.X, Last.X), FMath::Min(First.Y, Last.Y), 0.f) - Half;
+		OutMax = FVector(FMath::Max(First.X, Last.X), FMath::Max(First.Y, Last.Y), 0.f) + Half;
+	}
+}
+
+void AWeatherManager::GetWindSpan(float& OutMinAlong, float& OutMaxAlong, float& OutMinAcross, float& OutMaxAcross) const
+{
+	FVector Min;
+	FVector Max;
+	GetBoardBounds(Min, Max);
+	const FVector Wind = WindDirection.GetSafeNormal2D();
+	const FVector Side(-Wind.Y, Wind.X, 0.f);
+	const FVector Corners[4] = {
+		FVector(Min.X, Min.Y, 0.f),
+		FVector(Max.X, Min.Y, 0.f),
+		FVector(Max.X, Max.Y, 0.f),
+		FVector(Min.X, Max.Y, 0.f)
+	};
+
+	OutMinAlong = FVector::DotProduct(Corners[0], Wind);
+	OutMaxAlong = OutMinAlong;
+	OutMinAcross = FVector::DotProduct(Corners[0], Side);
+	OutMaxAcross = OutMinAcross;
+	for (const FVector& Corner : Corners)
+	{
+		const float Along = FVector::DotProduct(Corner, Wind);
+		const float Across = FVector::DotProduct(Corner, Side);
+		OutMinAlong = FMath::Min(OutMinAlong, Along);
+		OutMaxAlong = FMath::Max(OutMaxAlong, Along);
+		OutMinAcross = FMath::Min(OutMinAcross, Across);
+		OutMaxAcross = FMath::Max(OutMaxAcross, Across);
+	}
+}
+
 FVector AWeatherManager::MakeWindStreakSpawnLocation(bool bUpwindEdge) const
 {
 	const FVector Wind = WindDirection.GetSafeNormal2D();
 	const FVector Side(-Wind.Y, Wind.X, 0.f);
-	const float Across = FMath::FRandRange(-WindVolumeRadius, WindVolumeRadius);
-	const float Along = bUpwindEdge
-		? -WindVolumeRadius
-		: FMath::FRandRange(-WindVolumeRadius, WindVolumeRadius);
-	const float Height = FMath::FRandRange(80.f, 600.f);
+	float MinAlong = 0.f;
+	float MaxAlong = 0.f;
+	float MinAcross = 0.f;
+	float MaxAcross = 0.f;
+	GetWindSpan(MinAlong, MaxAlong, MinAcross, MaxAcross);
+	const float Margin = 250.f;
+	const float Along = bUpwindEdge ? MinAlong - Margin : FMath::FRandRange(MinAlong, MaxAlong);
+	const float Across = FMath::FRandRange(MinAcross, MaxAcross);
+	const float Height = FMath::FRandRange(60.f, 1000.f);
 	return Wind * Along + Side * Across + FVector(0.f, 0.f, Height);
 }
 
@@ -338,7 +387,7 @@ void AWeatherManager::BuildWindStreaks()
 	WindStreakMeshes.Reset();
 	WindStreakData.Reset();
 
-	for (int32 Index = 0; Index < 50; ++Index)
+	for (int32 Index = 0; Index < WindStreakCount; ++Index)
 	{
 		UStaticMeshComponent* Streak = NewObject<UStaticMeshComponent>(this);
 		Streak->SetupAttachment(Root);
@@ -425,6 +474,11 @@ void AWeatherManager::UpdateWindStreaks(float DeltaSeconds)
 	}
 
 	const float TimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
+	float MinAlong = 0.f;
+	float MaxAlong = 0.f;
+	float MinAcross = 0.f;
+	float MaxAcross = 0.f;
+	GetWindSpan(MinAlong, MaxAlong, MinAcross, MaxAcross);
 	for (int32 Index = 0; Index < WindStreakMeshes.Num(); ++Index)
 	{
 		UStaticMeshComponent* Streak = WindStreakMeshes[Index];
@@ -438,7 +492,7 @@ void AWeatherManager::UpdateWindStreaks(float DeltaSeconds)
 		Location += Wind * (Data.Speed * DeltaSeconds);
 
 		const float Along = FVector::DotProduct(FVector(Location.X, Location.Y, 0.f), Wind);
-		if (Along > WindVolumeRadius)
+		if (Along > MaxAlong + 250.f)
 		{
 			Location = MakeWindStreakSpawnLocation(true);
 			Data.BaseZ = Location.Z;
@@ -452,16 +506,9 @@ void AWeatherManager::UpdateWindStreaks(float DeltaSeconds)
 
 FVector AWeatherManager::MakeRainDropSpawnLocation(bool bAtTop) const
 {
-	FVector Min(0.f, 0.f, 0.f);
-	FVector Max(4000.f, 4000.f, 0.f);
-	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
-	{
-		const FVector First = Terrain->GridToWorldLocation(0, 0);
-		const FVector Last = Terrain->GridToWorldLocation(FMath::Max(Terrain->GridWidth - 1, 0), FMath::Max(Terrain->GridHeight - 1, 0));
-		const FVector Half(Terrain->TileDimensions.X * 0.5f, Terrain->TileDimensions.Y * 0.5f, 0.f);
-		Min = FVector(FMath::Min(First.X, Last.X), FMath::Min(First.Y, Last.Y), 0.f) - Half;
-		Max = FVector(FMath::Max(First.X, Last.X), FMath::Max(First.Y, Last.Y), 0.f) + Half;
-	}
+	FVector Min;
+	FVector Max;
+	GetBoardBounds(Min, Max);
 
 	const float Height = bAtTop
 		? FMath::FRandRange(RainMaxZ - 120.f, RainMaxZ)
@@ -619,52 +666,112 @@ void AWeatherManager::StrikeLightning()
 		return;
 	}
 
-	TArray<AActor*> Candidates;
+	TArray<AActor*> Attackers;
+	TArray<AActor*> Defenders;
 
 	TArray<AActor*> Enemies;
 	UGameplayStatics::GetAllActorsOfClass(World, AEnemyBase::StaticClass(), Enemies);
 	for (AActor* Actor : Enemies)
 	{
 		AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
-		if (Enemy && !Enemy->IsDefeated())
+		if (Enemy && !Enemy->IsDefeated() && !Enemy->IsBogAlly())
 		{
-			Candidates.Add(Enemy);
+			Attackers.Add(Enemy);
 		}
 	}
 
-	TArray<AActor*> Defenders;
-	UGameplayStatics::GetAllActorsOfClass(World, ADefenderBase::StaticClass(), Defenders);
-	for (AActor* Actor : Defenders)
+	TArray<AActor*> FoundDefenders;
+	UGameplayStatics::GetAllActorsOfClass(World, ADefenderBase::StaticClass(), FoundDefenders);
+	for (AActor* Actor : FoundDefenders)
 	{
 		ADefenderBase* Defender = Cast<ADefenderBase>(Actor);
 		if (Defender && !Defender->IsDestroyed())
 		{
-			Candidates.Add(Defender);
+			Defenders.Add(Defender);
 		}
 	}
 
-	if (Candidates.Num() == 0)
+	TArray<AActor*>* Pool = nullptr;
+	if (Attackers.Num() > 0 && Defenders.Num() > 0)
+	{
+		Pool = FMath::FRand() < 0.5f ? &Attackers : &Defenders;
+	}
+	else if (Attackers.Num() > 0)
+	{
+		Pool = &Attackers;
+	}
+	else if (Defenders.Num() > 0)
+	{
+		Pool = &Defenders;
+	}
+
+	if (!Pool)
 	{
 		return;
 	}
 
-	AActor* Victim = Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+	AActor* Victim = (*Pool)[FMath::RandRange(0, Pool->Num() - 1)];
 	if (AEnemyBase* Enemy = Cast<AEnemyBase>(Victim))
 	{
+		ShowLightningBolt(Enemy->GetActorLocation());
 		Enemy->TakeDamageFromDefender(Enemy->CurrentHealth);
 	}
 	else if (ADefenderBase* Defender = Cast<ADefenderBase>(Victim))
 	{
+		ShowLightningBolt(Defender->GetActorLocation());
 		Defender->ApplyDamage(Defender->MaxHealth);
 	}
 
 	LightningFlash = 1.f;
 	ApplyAtmosphere();
-	GetWorldTimerManager().SetTimer(LightningFlashTimer, this, &AWeatherManager::ClearLightningFlash, 0.12f, false);
+	GetWorldTimerManager().SetTimer(LightningFlashTimer, this, &AWeatherManager::ClearLightningFlash, 0.28f, false);
+}
+
+void AWeatherManager::ShowLightningBolt(const FVector& GroundPoint)
+{
+	if (!LightningBolt)
+	{
+		LightningBolt = NewObject<UStaticMeshComponent>(this);
+		LightningBolt->SetupAttachment(Root);
+		LightningBolt->RegisterComponent();
+		LightningBolt->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		LightningBolt->SetCastShadow(false);
+		LightningBolt->SetAbsolute(true, true, true);
+		if (UStaticMesh* Cylinder = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+		{
+			LightningBolt->SetStaticMesh(Cylinder);
+			if (UMaterialInterface* BaseMat = Cylinder->GetMaterial(0))
+			{
+				if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
+				{
+					const FLinearColor BoltColor(0.75f, 0.9f, 1.f, 1.f);
+					DynMat->SetVectorParameterValue(TEXT("Color"), BoltColor);
+					DynMat->SetVectorParameterValue(TEXT("BaseColor"), BoltColor);
+					LightningBolt->SetMaterial(0, DynMat);
+				}
+			}
+		}
+	}
+
+	const float Height = FMath::Max(RainMaxZ - GroundPoint.Z, 200.f);
+	LightningBolt->SetWorldScale3D(FVector(0.35f, 0.35f, Height / 100.f));
+	LightningBolt->SetWorldLocation(FVector(GroundPoint.X, GroundPoint.Y, GroundPoint.Z + Height * 0.5f));
+	LightningBolt->SetHiddenInGame(false);
+	LightningBolt->SetVisibility(true, true);
+}
+
+void AWeatherManager::HideLightningBolt()
+{
+	if (LightningBolt)
+	{
+		LightningBolt->SetVisibility(false, true);
+		LightningBolt->SetHiddenInGame(true);
+	}
 }
 
 void AWeatherManager::ClearLightningFlash()
 {
 	LightningFlash = 0.f;
+	HideLightningBolt();
 	ApplyAtmosphere();
 }

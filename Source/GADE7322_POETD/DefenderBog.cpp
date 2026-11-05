@@ -114,7 +114,7 @@ AEnemyBase* ADefenderBog::FindEnemyToEat() const
 	for (AActor* Actor : FoundEnemies)
 	{
 		AEnemyBase* Enemy = Cast<AEnemyBase>(Actor);
-		if (!Enemy || Enemy->IsDefeated() || Enemy->IsBeingEaten())
+		if (!Enemy || Enemy->IsDefeated() || Enemy->IsBeingEaten() || Enemy->IsBogAlly())
 		{
 			continue;
 		}
@@ -165,6 +165,13 @@ void ADefenderBog::ScanAndAttack()
 		}
 	}
 
+	if (bCanConvertEaten && FMath::FRand() < 0.3f)
+	{
+		Enemy->ConvertToBogAlly();
+		PulledEnemy = nullptr;
+		return;
+	}
+
 	Enemy->TakeDamageFromDefender(Enemy->CurrentHealth);
 	PulledEnemy = nullptr;
 	bIsDigesting = true;
@@ -191,6 +198,19 @@ void ADefenderBog::FinishDigesting()
 void ADefenderBog::ApplyDigestUpgrade()
 {
 	DigestDuration = FMath::Max(1.f, DigestDuration - 3.f);
+}
+
+void ADefenderBog::ApplyFastDigestUpgrade()
+{
+	DigestDuration = FMath::Max(1.f, DigestDuration - 5.f);
+}
+
+void ADefenderBog::ApplyConvertUpgrade()
+{
+	bCanConvertEaten = true;
+	MaxHealth += 50.f;
+	CurrentHealth = FMath::Min(CurrentHealth + 50.f, MaxHealth);
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
 
 void ADefenderBog::ApplyUpgradeVisual()

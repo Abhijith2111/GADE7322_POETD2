@@ -26,13 +26,13 @@ namespace
 		Text->SetColorAndOpacity(FSlateColor(Color));
 	}
 
-	UButton* MakeMenuButton(UWidgetTree* Tree, const FName Name, const FText& Caption)
+	UButton* MakeMenuButton(UWidgetTree* Tree, const FName Name, const FText& Caption, UTextBlock*& OutLabel)
 	{
 		UButton* Button = Tree->ConstructWidget<UButton>(UButton::StaticClass(), Name);
 		Button->SetBackgroundColor(FLinearColor(1.f, 0.55f, 0.05f, 1.f));
-		UTextBlock* Label = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), *FString::Printf(TEXT("%sLabel"), *Name.ToString()));
-		StyleMenuText(Label, Caption, 20.f, FLinearColor(0.05f, 0.05f, 0.05f, 1.f));
-		Button->AddChild(Label);
+		OutLabel = Tree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), *FString::Printf(TEXT("%sLabel"), *Name.ToString()));
+		StyleMenuText(OutLabel, Caption, 18.f, FLinearColor(0.05f, 0.05f, 0.05f, 1.f));
+		Button->AddChild(OutLabel);
 		return Button;
 	}
 }
@@ -63,11 +63,18 @@ void UUpgradeMenuWidget::BuildMenu()
 	StyleMenuText(TitleText, NSLOCTEXT("Upgrade", "Title", "Upgrade"), 26.f, FLinearColor::White);
 	BonusTextBlock = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("UpgradeBonus"));
 	StyleMenuText(BonusTextBlock, FText::GetEmpty(), 18.f, FLinearColor(0.9f, 0.9f, 0.9f, 1.f));
+	BonusTextBlock->SetAutoWrapText(true);
 	CostText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("UpgradeCost"));
 	StyleMenuText(CostText, FText::GetEmpty(), 18.f, FLinearColor(1.f, 0.85f, 0.2f, 1.f));
 
-	UpgradeButton = MakeMenuButton(WidgetTree, TEXT("UpgradeButton"), NSLOCTEXT("Upgrade", "Buy", "Upgrade"));
-	CloseButton = MakeMenuButton(WidgetTree, TEXT("CloseButton"), NSLOCTEXT("Upgrade", "Close", "Close"));
+	UTextBlock* UpgradeLabel = nullptr;
+	UTextBlock* PowerLabel = nullptr;
+	UTextBlock* CloseLabel = nullptr;
+	UpgradeButton = MakeMenuButton(WidgetTree, TEXT("UpgradeButton"), NSLOCTEXT("Upgrade", "Buy", "Upgrade"), UpgradeLabel);
+	PowerButton = MakeMenuButton(WidgetTree, TEXT("PowerButton"), NSLOCTEXT("Upgrade", "Power", "Attack power"), PowerLabel);
+	CloseButton = MakeMenuButton(WidgetTree, TEXT("CloseButton"), NSLOCTEXT("Upgrade", "Close", "Close"), CloseLabel);
+	UpgradeButtonLabel = UpgradeLabel;
+	PowerButtonLabel = PowerLabel;
 
 	auto AddRow = [Column](UWidget* Child, float BottomPad)
 	{
@@ -80,6 +87,7 @@ void UUpgradeMenuWidget::BuildMenu()
 	AddRow(BonusTextBlock, 4.f);
 	AddRow(CostText, 12.f);
 	AddRow(UpgradeButton, 8.f);
+	AddRow(PowerButton, 8.f);
 	AddRow(CloseButton, 16.f);
 
 	if (UCanvasPanelSlot* PanelSlot = Root->AddChildToCanvas(Panel))
@@ -98,6 +106,10 @@ void UUpgradeMenuWidget::NativeConstruct()
 	{
 		UpgradeButton->OnClicked.AddDynamic(this, &UUpgradeMenuWidget::HandleUpgradeClicked);
 	}
+	if (PowerButton)
+	{
+		PowerButton->OnClicked.AddDynamic(this, &UUpgradeMenuWidget::HandlePowerClicked);
+	}
 	if (CloseButton)
 	{
 		CloseButton->OnClicked.AddDynamic(this, &UUpgradeMenuWidget::HandleCloseClicked);
@@ -109,14 +121,17 @@ void UUpgradeMenuWidget::BindController(ATDPlayerController* InController)
 	OwnerController = InController;
 }
 
-void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, const FText& BonusText)
+void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText)
 {
 	(void)Defender;
+	const bool bMaxed = Level >= MaxLevel;
 	if (TitleText)
 	{
-		TitleText->SetText(Level >= 1
+		TitleText->SetText(bMaxed
 			? NSLOCTEXT("Upgrade", "Maxed", "Already upgraded")
-			: NSLOCTEXT("Upgrade", "Title", "Upgrade"));
+			: (bArcherChoice
+				? NSLOCTEXT("Upgrade", "ChooseTitle", "Choose an upgrade")
+				: NSLOCTEXT("Upgrade", "Title", "Upgrade")));
 	}
 	if (BonusTextBlock)
 	{
@@ -124,14 +139,25 @@ void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, in
 	}
 	if (CostText)
 	{
-		CostText->SetText(Level >= 1
+		CostText->SetText(bMaxed
 			? NSLOCTEXT("Upgrade", "NoCost", "")
 			: FText::Format(NSLOCTEXT("Upgrade", "CostFmt", "{0} coins"), FText::AsNumber(Cost)));
 	}
+	if (UpgradeButtonLabel)
+	{
+		UpgradeButtonLabel->SetText(bArcherChoice
+			? NSLOCTEXT("Upgrade", "HealthSpeed", "Health and attack speed")
+			: NSLOCTEXT("Upgrade", "Buy", "Upgrade"));
+	}
 	if (UpgradeButton)
 	{
-		UpgradeButton->SetIsEnabled(Level < 1);
-		UpgradeButton->SetVisibility(Level >= 1 ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+		UpgradeButton->SetIsEnabled(!bMaxed);
+		UpgradeButton->SetVisibility(bMaxed ? ESlateVisibility::Collapsed : ESlateVisibility::Visible);
+	}
+	if (PowerButton)
+	{
+		PowerButton->SetIsEnabled(bArcherChoice);
+		PowerButton->SetVisibility(bArcherChoice ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
 	}
 }
 
@@ -140,6 +166,14 @@ void UUpgradeMenuWidget::HandleUpgradeClicked()
 	if (ATDPlayerController* PC = OwnerController.Get())
 	{
 		PC->ConfirmSelectedUpgrade();
+	}
+}
+
+void UUpgradeMenuWidget::HandlePowerClicked()
+{
+	if (ATDPlayerController* PC = OwnerController.Get())
+	{
+		PC->ConfirmArcherPowerUpgrade();
 	}
 }
 

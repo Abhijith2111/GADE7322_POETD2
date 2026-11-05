@@ -15,6 +15,8 @@ class GADE7322_POETD_API ADefenderBog : public ADefenderBase
 public:
 	ADefenderBog();
 	void ApplyDigestUpgrade();
+	void ApplyFastDigestUpgrade();
+	void ApplyConvertUpgrade();
 
 protected:
 	virtual void BeginPlay() override;
@@ -28,6 +30,7 @@ protected:
 
 private:
 	bool bIsDigesting = false;
+	bool bCanConvertEaten = false;
 	FTimerHandle DigestTimerHandle;
 	TWeakObjectPtr<AEnemyBase> PulledEnemy;
 

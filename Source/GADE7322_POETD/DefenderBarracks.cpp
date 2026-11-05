@@ -220,13 +220,38 @@ void ADefenderBarracks::SpawnOneKnight()
 
 	FActorSpawnParameters SpawnParams;
 	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	World->SpawnActor<ADefenderKnight>(KnightClass, GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParams);
+	ADefenderKnight* Knight = World->SpawnActor<ADefenderKnight>(KnightClass, GetActorLocation() + Offset, FRotator::ZeroRotator, SpawnParams);
+	if (!Knight)
+	{
+		return;
+	}
+
+	Knight->AttackDamage += KnightDamageBonus;
+	if (KnightHealthBonus > 0.f)
+	{
+		Knight->MaxHealth += KnightHealthBonus;
+		Knight->CurrentHealth = Knight->MaxHealth;
+		Knight->OnHealthChanged.Broadcast(Knight->CurrentHealth, Knight->MaxHealth);
+	}
 }
 
 void ADefenderBarracks::ApplyTrainUpgrade()
 {
 	KnightTrainInterval = FMath::Max(1.f, KnightTrainInterval - 3.f);
 	RefreshTrainingForWeather(true);
+}
+
+void ADefenderBarracks::ApplyProductionUpgrade()
+{
+	KnightTrainInterval = FMath::Max(1.f, KnightTrainInterval - 3.f);
+	KnightDamageBonus += 1.f;
+	RefreshTrainingForWeather(true);
+}
+
+void ADefenderBarracks::ApplyTroopUpgrade()
+{
+	KnightDamageBonus += 2.f;
+	KnightHealthBonus += 50.f;
 }
 
 void ADefenderBarracks::ApplyUpgradeVisual()
