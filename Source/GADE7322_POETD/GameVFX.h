@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 
+class AActor;
 class UMaterialInterface;
 class UMaterialInstanceDynamic;
 class UNiagaraSystem;
@@ -19,4 +20,5 @@ namespace GameVFX
 	void ApplyMaterialToMesh(UStaticMeshComponent* Mesh, UMaterialInterface* Material);
 	UMaterialInstanceDynamic* ApplyDynamicMaterialToMesh(UStaticMeshComponent* Mesh, UMaterialInterface* Material);
 	void SpawnNiagaraAt(UWorld* World, UNiagaraSystem* System, const FVector& Location);
+	void UpdateGoldRing(AActor* Owner, UStaticMeshComponent* BuildingMesh, TObjectPtr<UStaticMeshComponent>& Ring, int32 Stage);
 }

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/WidgetComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "HealthDisplayInterface.h"
 #include "HitFlash.h"
 #include "CentralTowerBase.generated.h"
@@ -70,6 +71,8 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Health")
 	float GetHealthPercent() const;
 
+	void ApplyPurchasedUpgrade(int32 NextLevel);
+
 private:
 	bool bIsDestroyed = false;
 	FTimerHandle AttackTimerHandle;
@@ -84,6 +87,9 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> TempleStrainMID;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> UpgradeRing;
 
 	float HitStrainSpike = 0.f;
 	FTimerHandle StrainDecayTimer;

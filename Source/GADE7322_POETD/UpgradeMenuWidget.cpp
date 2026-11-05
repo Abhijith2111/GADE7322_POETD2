@@ -121,7 +121,7 @@ void UUpgradeMenuWidget::BindController(ATDPlayerController* InController)
 	OwnerController = InController;
 }
 
-void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText)
+void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText, const FText& PrimaryButtonText)
 {
 	(void)Defender;
 	const bool bMaxed = Level >= MaxLevel;
@@ -147,7 +147,9 @@ void UUpgradeMenuWidget::ShowForDefender(ADefenderBase* Defender, int32 Cost, in
 	{
 		UpgradeButtonLabel->SetText(bArcherChoice
 			? NSLOCTEXT("Upgrade", "HealthSpeed", "Health and attack speed")
-			: NSLOCTEXT("Upgrade", "Buy", "Upgrade"));
+			: (PrimaryButtonText.IsEmpty()
+				? NSLOCTEXT("Upgrade", "Buy", "Upgrade")
+				: PrimaryButtonText));
 	}
 	if (UpgradeButton)
 	{

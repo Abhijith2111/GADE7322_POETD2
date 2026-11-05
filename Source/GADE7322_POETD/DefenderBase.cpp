@@ -327,6 +327,23 @@ void ADefenderBase::RestartAttackTimer()
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ADefenderBase::ScanAndAttack, Interval, true, Interval);
 }
 
+void ADefenderBase::AddUpgradeHealth(float Amount)
+{
+	if (bIsDestroyed || Amount <= 0.f)
+	{
+		return;
+	}
+
+	MaxHealth += Amount;
+	CurrentHealth = FMath::Min(CurrentHealth + Amount, MaxHealth);
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+}
+
+void ADefenderBase::ShowUpgradeRing(int32 Stage)
+{
+	GameVFX::UpdateGoldRing(this, DefenderMesh, UpgradeRing, Stage);
+}
+
 void ADefenderBase::ApplyDamage(float DamageAmount)
 {
 	if (bIsDestroyed || DamageAmount <= 0.f)

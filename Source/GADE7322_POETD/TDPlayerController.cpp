@@ -18,7 +18,9 @@
 #include "UpgradeMenuWidget.h"
 #include "DifficultyBriefingWidget.h"
 #include "WeatherStatusWidget.h"
+#include "Engine/World.h"
 #include "GameVFX.h"
+#include "UpgradeSparkle.h"
 #include "WeatherManager.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/Button.h"
@@ -815,6 +817,11 @@ void ATDPlayerController::TryPlaceDefender()
 	ADefenderBase* ClickedDefender = nullptr;
 	if (bHit && Hit.GetActor())
 	{
+		if (ACentralTowerBase* Tower = Cast<ACentralTowerBase>(Hit.GetActor()))
+		{
+			OpenTowerUpgradeMenu(Tower);
+			return;
+		}
 		ClickedDefender = Cast<ADefenderBase>(Hit.GetActor());
 	}
 
@@ -824,7 +831,7 @@ void ATDPlayerController::TryPlaceDefender()
 		return;
 	}
 
-	if (SelectedUpgradeTarget.IsValid())
+	if (SelectedUpgradeTarget.IsValid() || SelectedTowerTarget.IsValid())
 	{
 		CloseUpgradeMenu();
 		return;
@@ -954,6 +961,7 @@ void ATDPlayerController::HandleDefenderDestroyed(ADefenderBase* DestroyedDefend
 	}
 
 	DefenderUpgradeLevels.Remove(DestroyedDefender);
+	ArcherUpgradePaths.Remove(DestroyedDefender);
 
 	if (SelectedUpgradeTarget.Get() == DestroyedDefender)
 	{
@@ -1023,7 +1031,7 @@ bool ATDPlayerController::IsUpgradableDefender(const ADefenderBase* Defender) co
 	{
 		return false;
 	}
-	if (Defender->IsA(ADefenderKnight::StaticClass()) || Defender->IsA(ADefenderMineShaft::StaticClass()))
+	if (Defender->IsA(ADefenderKnight::StaticClass()))
 	{
 		return false;
 	}
@@ -1042,7 +1050,7 @@ int32 ATDPlayerController::GetUpgradeCostFor(const ADefenderBase* Defender) cons
 	{
 		return 200;
 	}
-	if (Defender->IsA(ADefenderBarracks::StaticClass()))
+	if (Defender->IsA(ADefenderBarracks::StaticClass()) || Defender->IsA(ADefenderMineShaft::StaticClass()))
 	{
 		return 150;
 	}
@@ -1059,9 +1067,13 @@ int32 ATDPlayerController::GetMaxUpgradeLevel(const ADefenderBase* Defender) con
 	{
 		return 3;
 	}
-	if (IsArcherDefender(Defender))
+	if (Defender->IsA(ADefenderMineShaft::StaticClass()))
 	{
 		return 2;
+	}
+	if (IsArcherDefender(Defender))
+	{
+		return 3;
 	}
 	return 1;
 }
@@ -1073,6 +1085,12 @@ bool ATDPlayerController::IsArcherDefender(const ADefenderBase* Defender) const
 		&& !Defender->IsA(ADefenderBarracks::StaticClass())
 		&& !Defender->IsA(ADefenderKnight::StaticClass())
 		&& !Defender->IsA(ADefenderMineShaft::StaticClass());
+}
+
+int32 ATDPlayerController::GetArcherUpgradePath(const ADefenderBase* Defender) const
+{
+	const int32* Path = ArcherUpgradePaths.Find(Defender);
+	return Path ? *Path : 0;
 }
 
 FText ATDPlayerController::GetUpgradeBonusText(const ADefenderBase* Defender) const
@@ -1093,11 +1111,11 @@ FText ATDPlayerController::GetUpgradeBonusText(const ADefenderBase* Defender) co
 	{
 		if (Level <= 0)
 		{
-			return NSLOCTEXT("Upgrade", "BogBonus", "Level 1: digestion 3 seconds faster");
+			return NSLOCTEXT("Upgrade", "BogBonus", "Level 1: +30 health and digestion 3 seconds faster");
 		}
 		if (Level == 1)
 		{
-			return NSLOCTEXT("Upgrade", "BogBonus2", "Level 2: digestion 5 seconds faster");
+			return NSLOCTEXT("Upgrade", "BogBonus2", "Level 2: +30 health and digestion 5 seconds faster");
 		}
 		return NSLOCTEXT("Upgrade", "BogBonus3", "Level 3: +50 health. 30% chance an eaten enemy becomes an ally.");
 	}
@@ -1105,17 +1123,33 @@ FText ATDPlayerController::GetUpgradeBonusText(const ADefenderBase* Defender) co
 	{
 		if (Level <= 0)
 		{
-			return NSLOCTEXT("Upgrade", "BarracksBonus", "Level 1: knights train 3 seconds faster");
+			return NSLOCTEXT("Upgrade", "BarracksBonus", "Level 1: +40 health, and knights train 3 seconds faster");
 		}
 		if (Level == 1)
 		{
-			return NSLOCTEXT("Upgrade", "BarracksBonus2", "Level 2: knights train 3 seconds faster, and new knights hit for 1 more damage");
+			return NSLOCTEXT("Upgrade", "BarracksBonus2", "Level 2: +40 health, knights train 3 seconds faster, and new knights hit for 1 more damage");
 		}
-		return NSLOCTEXT("Upgrade", "BarracksBonus3", "Level 3: new knights hit for 2 more damage and have 50 more health");
+		return NSLOCTEXT("Upgrade", "BarracksBonus3", "Level 3: +40 health. New knights hit for 2 more damage and have 50 more health");
+	}
+	if (Defender->IsA(ADefenderMineShaft::StaticClass()))
+	{
+		if (Level <= 0)
+		{
+			return NSLOCTEXT("Upgrade", "MineBonus", "Level 1: +40 health and payouts 3 seconds faster");
+		}
+		return NSLOCTEXT("Upgrade", "MineBonus2", "Level 2: +40 health and +10 coins per payout");
 	}
 	if (IsArcherDefender(Defender) && Level == 1)
 	{
-		return NSLOCTEXT("Upgrade", "ArcherChoice", "Choose one. Health and attack speed, or attack power.");
+		return NSLOCTEXT("Upgrade", "ArcherChoice", "Choose one path. The next upgrade stays on that path. Both add health.");
+	}
+	if (IsArcherDefender(Defender) && Level >= 2)
+	{
+		if (GetArcherUpgradePath(Defender) == 1)
+		{
+			return NSLOCTEXT("Upgrade", "ArcherPowerFollow", "Attack power: +15 damage and +20 health");
+		}
+		return NSLOCTEXT("Upgrade", "ArcherHealthFollow", "Health and attack speed: +30 health and a faster shot");
 	}
 	return NSLOCTEXT("Upgrade", "ArcherBonus", "Level 1: +20 health and +5 damage");
 }
@@ -1158,14 +1192,14 @@ bool ATDPlayerController::IsBogCapReached() const
 	return Cap > 0 && CountLivingBogs() >= Cap;
 }
 
-void ATDPlayerController::ZoomToDefender(ADefenderBase* Defender)
+void ATDPlayerController::ZoomToTarget(AActor* Target)
 {
-	if (!Defender || !GetPawn())
+	if (!Target || !GetPawn())
 	{
 		return;
 	}
 
-	const FVector Focus = Defender->GetActorLocation();
+	const FVector Focus = Target->GetActorLocation();
 	const float Height = 520.f;
 	const FVector CameraLocation = Focus + FVector(-Height * 0.55f, 0.f, Height);
 	const FRotator CameraRotation = (Focus - CameraLocation).Rotation();
@@ -1198,6 +1232,7 @@ void ATDPlayerController::OpenUpgradeMenu(ADefenderBase* Defender)
 		return;
 	}
 
+	SelectedTowerTarget.Reset();
 	SelectedUpgradeTarget = Defender;
 	if (!UpgradeMenuInstance)
 	{
@@ -1213,13 +1248,57 @@ void ATDPlayerController::OpenUpgradeMenu(ADefenderBase* Defender)
 		UpgradeMenuInstance->SetVisibility(ESlateVisibility::Visible);
 		RefreshUpgradeMenu();
 	}
-	ZoomToDefender(Defender);
+	ZoomToTarget(Defender);
+}
+
+void ATDPlayerController::OpenTowerUpgradeMenu(ACentralTowerBase* Tower)
+{
+	if (!Tower || Tower->IsDestroyed())
+	{
+		return;
+	}
+
+	SelectedUpgradeTarget.Reset();
+	SelectedTowerTarget = Tower;
+	if (!UpgradeMenuInstance)
+	{
+		UpgradeMenuInstance = CreateWidget<UUpgradeMenuWidget>(this, UUpgradeMenuWidget::StaticClass());
+		if (UpgradeMenuInstance)
+		{
+			UpgradeMenuInstance->BindController(this);
+			UpgradeMenuInstance->AddToViewport(20);
+		}
+	}
+	if (UpgradeMenuInstance)
+	{
+		UpgradeMenuInstance->SetVisibility(ESlateVisibility::Visible);
+		RefreshUpgradeMenu();
+	}
+	ZoomToTarget(Tower);
 }
 
 void ATDPlayerController::RefreshUpgradeMenu()
 {
+	if (!UpgradeMenuInstance)
+	{
+		return;
+	}
+
+	if (ACentralTowerBase* Tower = SelectedTowerTarget.Get())
+	{
+		UpgradeMenuInstance->ShowForDefender(
+			nullptr,
+			250,
+			TowerUpgradeLevel,
+			2,
+			false,
+			GetTowerUpgradeBonusText(),
+			FText::GetEmpty());
+		return;
+	}
+
 	ADefenderBase* Defender = SelectedUpgradeTarget.Get();
-	if (!UpgradeMenuInstance || !Defender)
+	if (!Defender)
 	{
 		return;
 	}
@@ -1227,18 +1306,27 @@ void ATDPlayerController::RefreshUpgradeMenu()
 	const int32* LevelPtr = DefenderUpgradeLevels.Find(Defender);
 	const int32 Level = LevelPtr ? *LevelPtr : 0;
 	const int32 MaxLevel = GetMaxUpgradeLevel(Defender);
+	FText PrimaryLabel;
+	if (IsArcherDefender(Defender) && Level >= 2 && Level < MaxLevel)
+	{
+		PrimaryLabel = GetArcherUpgradePath(Defender) == 1
+			? NSLOCTEXT("Upgrade", "Power", "Attack power")
+			: NSLOCTEXT("Upgrade", "HealthSpeed", "Health and attack speed");
+	}
 	UpgradeMenuInstance->ShowForDefender(
 		Defender,
 		GetUpgradeCostFor(Defender),
 		Level,
 		MaxLevel,
 		IsArcherDefender(Defender) && Level == 1,
-		GetUpgradeBonusText(Defender));
+		GetUpgradeBonusText(Defender),
+		PrimaryLabel);
 }
 
 void ATDPlayerController::CloseUpgradeMenu()
 {
 	SelectedUpgradeTarget.Reset();
+	SelectedTowerTarget.Reset();
 	if (UpgradeMenuInstance)
 	{
 		UpgradeMenuInstance->SetVisibility(ESlateVisibility::Collapsed);
@@ -1264,6 +1352,12 @@ void ATDPlayerController::ConfirmArcherPowerUpgrade()
 
 void ATDPlayerController::ApplyChosenUpgrade(int32 Choice)
 {
+	if (SelectedTowerTarget.IsValid())
+	{
+		ApplyTowerUpgrade();
+		return;
+	}
+
 	ADefenderBase* Defender = SelectedUpgradeTarget.Get();
 	if (!Defender || !IsUpgradableDefender(Defender))
 	{
@@ -1322,30 +1416,68 @@ void ATDPlayerController::ApplyChosenUpgrade(int32 Choice)
 		{
 			Barracks->ApplyTroopUpgrade();
 		}
+		Defender->AddUpgradeHealth(40.f);
+	}
+	else if (ADefenderMineShaft* Mine = Cast<ADefenderMineShaft>(Defender))
+	{
+		if (NextLevel <= 1)
+		{
+			Mine->ApplyPayoutUpgrade();
+		}
+		else
+		{
+			Mine->ApplyRicherUpgrade();
+		}
+		Mine->AddUpgradeHealth(40.f);
 	}
 	else if (NextLevel <= 1)
 	{
-		Defender->MaxHealth += 20.f;
-		Defender->CurrentHealth = FMath::Min(Defender->CurrentHealth + 20.f, Defender->MaxHealth);
+		Defender->AddUpgradeHealth(20.f);
 		Defender->AttackDamage += 5.f;
-		Defender->OnHealthChanged.Broadcast(Defender->CurrentHealth, Defender->MaxHealth);
 	}
-	else if (Choice == 0)
+	else if (NextLevel == 2)
 	{
-		Defender->MaxHealth += 30.f;
-		Defender->CurrentHealth = FMath::Min(Defender->CurrentHealth + 30.f, Defender->MaxHealth);
-		Defender->OnHealthChanged.Broadcast(Defender->CurrentHealth, Defender->MaxHealth);
+		const int32 Path = Choice == 0 ? 0 : 1;
+		ArcherUpgradePaths.Add(Defender, Path);
+		if (Path == 0)
+		{
+			Defender->AddUpgradeHealth(30.f);
+			Defender->AttackInterval = FMath::Max(0.4f, Defender->AttackInterval - 0.25f);
+			Defender->RestartAttackTimer();
+		}
+		else
+		{
+			Defender->AddUpgradeHealth(20.f);
+			Defender->AttackDamage += 10.f;
+		}
+	}
+	else if (GetArcherUpgradePath(Defender) == 0)
+	{
+		Defender->AddUpgradeHealth(30.f);
 		Defender->AttackInterval = FMath::Max(0.4f, Defender->AttackInterval - 0.25f);
 		Defender->RestartAttackTimer();
 	}
 	else
 	{
-		Defender->AttackDamage += 10.f;
+		Defender->AddUpgradeHealth(20.f);
+		Defender->AttackDamage += 15.f;
+	}
+
+	if (ADefenderBog* HealthBog = Cast<ADefenderBog>(Defender))
+	{
+		if (NextLevel < 3)
+		{
+			HealthBog->AddUpgradeHealth(30.f);
+		}
 	}
 
 	if (NextLevel == 1)
 	{
 		Defender->ApplyUpgradeVisual();
+	}
+	else
+	{
+		Defender->ShowUpgradeRing(NextLevel >= 3 ? 2 : 1);
 	}
 
 	*LevelPtr = NextLevel;
@@ -1354,12 +1486,65 @@ void ATDPlayerController::ApplyChosenUpgrade(int32 Choice)
 	RefreshUpgradeMenu();
 }
 
-void ATDPlayerController::PlayUpgradeSparkle(ADefenderBase* Defender)
+void ATDPlayerController::ApplyTowerUpgrade()
 {
-	if (!Defender || !GetWorld())
+	ACentralTowerBase* Tower = SelectedTowerTarget.Get();
+	if (!Tower || Tower->IsDestroyed())
+	{
+		return;
+	}
+	if (TowerUpgradeLevel >= 2)
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("No further upgrades."));
+		RefreshUpgradeMenu();
+		return;
+	}
+	if (!HasEnoughMoney(250))
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Not enough gold to upgrade."));
+		return;
+	}
+
+	SpendMoney(250);
+	++TowerUpgradeLevel;
+	Tower->ApplyPurchasedUpgrade(TowerUpgradeLevel);
+	PlayUpgradeSparkle(Tower);
+	RefreshUpgradeMenu();
+}
+
+FText ATDPlayerController::GetTowerUpgradeBonusText() const
+{
+	if (TowerUpgradeLevel <= 0)
+	{
+		return NSLOCTEXT("Upgrade", "TempleBonus", "Level 1: +100 health and +8 attack damage");
+	}
+	if (TowerUpgradeLevel == 1)
+	{
+		return NSLOCTEXT("Upgrade", "TempleBonus2", "Level 2: +100 health and attacks 20% faster");
+	}
+	return NSLOCTEXT("Upgrade", "FullyUpgraded", "Fully upgraded");
+}
+
+int32 ATDPlayerController::GetPurchasedUpgradeCount() const
+{
+	int32 Total = TowerUpgradeLevel;
+	for (const TPair<ADefenderBase*, int32>& Pair : DefenderUpgradeLevels)
+	{
+		Total += FMath::Max(Pair.Value, 0);
+	}
+	return Total;
+}
+
+void ATDPlayerController::PlayUpgradeSparkle(AActor* Target)
+{
+	if (!Target || !GetWorld())
 	{
 		return;
 	}
 
-	GameVFX::SpawnNiagaraAt(GetWorld(), GameVFX::LoadUpgradeBurstSystem(), Defender->GetActorLocation() + FVector(0.f, 0.f, 80.f));
+	const FVector Location = Target->GetActorLocation();
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	GetWorld()->SpawnActor<AUpgradeSparkle>(Location, FRotator::ZeroRotator, Params);
+	GameVFX::SpawnNiagaraAt(GetWorld(), GameVFX::LoadUpgradeBurstSystem(), Location + FVector(0.f, 0.f, 80.f));
 }

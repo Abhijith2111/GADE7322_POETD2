@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Components/WidgetComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "HealthDisplayInterface.h"
 #include "HitFlash.h"
 #include "DefenderBase.generated.h"
@@ -67,6 +68,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void ApplyDamage(float DamageAmount);
 
+	void AddUpgradeHealth(float Amount);
+	void ShowUpgradeRing(int32 Stage);
 	void RestartAttackTimer();
 
 	UFUNCTION(BlueprintPure, Category = "Health")
@@ -86,6 +89,9 @@ private:
 
 	UPROPERTY()
 	TArray<UMaterialInterface*> HitFlashMaterials;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> UpgradeRing;
 
 	void PlayHitFlash();
 

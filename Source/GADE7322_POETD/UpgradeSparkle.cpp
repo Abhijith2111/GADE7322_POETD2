@@ -13,10 +13,12 @@ AUpgradeSparkle::AUpgradeSparkle()
 
 	GlowLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("GlowLight"));
 	GlowLight->SetupAttachment(Root);
-	GlowLight->SetLightColor(FLinearColor(1.f, 1.f, 0.15f));
-	GlowLight->SetIntensity(12000.f);
-	GlowLight->SetAttenuationRadius(420.f);
+	GlowLight->SetMobility(EComponentMobility::Movable);
+	GlowLight->SetLightColor(FLinearColor(1.f, 0.86f, 0.25f));
+	GlowLight->SetIntensity(6500.f);
+	GlowLight->SetAttenuationRadius(260.f);
 	GlowLight->SetCastShadows(false);
+	GlowLight->bUseInverseSquaredFalloff = false;
 }
 
 void AUpgradeSparkle::BeginPlay()
@@ -24,8 +26,12 @@ void AUpgradeSparkle::BeginPlay()
 	Super::BeginPlay();
 
 	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	UMaterialInterface* BaseMat = Sphere ? Sphere->GetMaterial(0) : nullptr;
-	const FLinearColor Yellow(1.f, 1.f, 0.15f, 1.f);
+	UMaterialInterface* GlowMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_GoldParticle.M_GoldParticle"));
+	if (!GlowMat)
+	{
+		GlowMat = Sphere ? Sphere->GetMaterial(0) : nullptr;
+	}
+	const FLinearColor Yellow(1.f, 0.9f, 0.2f, 1.f);
 
 	for (int32 Index = 0; Index < 22; ++Index)
 	{
@@ -38,15 +44,15 @@ void AUpgradeSparkle::BeginPlay()
 		{
 			Spark->SetStaticMesh(Sphere);
 		}
-		Spark->SetWorldScale3D(FVector(0.18f));
-		Spark->SetWorldLocation(GetActorLocation() + FMath::VRand() * 42.f);
-		if (BaseMat)
+		Spark->SetWorldScale3D(FVector(0.14f));
+		Spark->SetWorldLocation(GetActorLocation() + FMath::VRand() * 36.f);
+		if (GlowMat)
 		{
-			if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
+			if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(GlowMat, this))
 			{
 				DynMat->SetVectorParameterValue(TEXT("Color"), Yellow);
 				DynMat->SetVectorParameterValue(TEXT("BaseColor"), Yellow);
-				DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), Yellow * 8.f);
+				DynMat->SetVectorParameterValue(TEXT("EmissiveColor"), Yellow * 4.f);
 				Spark->SetMaterial(0, DynMat);
 			}
 		}
@@ -64,7 +70,7 @@ void AUpgradeSparkle::Tick(float DeltaSeconds)
 	const float Fade = FMath::Clamp(1.f - Life / 1.1f, 0.f, 1.f);
 	if (GlowLight)
 	{
-		GlowLight->SetIntensity(12000.f * Fade);
+		GlowLight->SetIntensity(6500.f * Fade);
 	}
 	for (int32 Index = 0; Index < Sparks.Num(); ++Index)
 	{
@@ -73,6 +79,6 @@ void AUpgradeSparkle::Tick(float DeltaSeconds)
 			continue;
 		}
 		Sparks[Index]->AddWorldOffset(Velocities[Index] * DeltaSeconds, false);
-		Sparks[Index]->SetWorldScale3D(FVector(0.18f * Fade));
+		Sparks[Index]->SetWorldScale3D(FVector(0.14f * Fade));
 	}
 }

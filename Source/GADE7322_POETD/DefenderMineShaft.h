@@ -12,10 +12,14 @@ class GADE7322_POETD_API ADefenderMineShaft : public ADefenderBase
 public:
 	ADefenderMineShaft();
 
+	void ApplyPayoutUpgrade();
+	void ApplyRicherUpgrade();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void ApplyDefenderMesh() override;
+	virtual void ApplyUpgradeVisual() override;
 	virtual void ScanAndAttack() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Income", meta = (ClampMin = "1"))
@@ -26,6 +30,7 @@ protected:
 
 	UFUNCTION()
 	void GenerateIncome();
+	void RestartIncomeTimer();
 
 	FTimerHandle IncomeTimerHandle;
 };

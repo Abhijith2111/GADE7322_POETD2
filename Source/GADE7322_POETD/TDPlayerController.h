@@ -13,6 +13,7 @@ class UButton;
 class UDifficultyBriefingWidget;
 class UUpgradeMenuWidget;
 class UWeatherStatusWidget;
+class ACentralTowerBase;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementSucceeded, ADefenderBase*, PlacedDefender);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnDefenderPlacementFailed, FString, Reason);
@@ -93,6 +94,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Upgrade")
 	void CloseUpgradeMenu();
 
+	UFUNCTION(BlueprintPure, Category = "Upgrade")
+	int32 GetPurchasedUpgradeCount() const;
+
 	UFUNCTION(BlueprintCallable, Category = "UI")
 	void TogglePause();
 
@@ -155,6 +159,8 @@ private:
 	UWeatherStatusWidget* WeatherStatusInstance;
 
 	TWeakObjectPtr<ADefenderBase> SelectedUpgradeTarget;
+	TWeakObjectPtr<ACentralTowerBase> SelectedTowerTarget;
+	int32 TowerUpgradeLevel = 0;
 	bool bUpgradeCameraActive = false;
 
 	bool bIsPaused = false;
@@ -182,6 +188,7 @@ private:
 	TSet<int32> OccupiedGridIndices;
 	TMap<ADefenderBase*, int32> DefenderGridIndices;
 	TMap<ADefenderBase*, int32> DefenderUpgradeLevels;
+	TMap<ADefenderBase*, int32> ArcherUpgradePaths;
 
 	UFUNCTION()
 	void HandleDefenderDestroyed(ADefenderBase* DestroyedDefender);
@@ -201,17 +208,21 @@ private:
 	void PlaceOverviewCamera();
 
 	void ClampOverviewCamera();
-	void ZoomToDefender(ADefenderBase* Defender);
+	void ZoomToTarget(AActor* Target);
 	void OpenUpgradeMenu(ADefenderBase* Defender);
+	void OpenTowerUpgradeMenu(ACentralTowerBase* Tower);
+	void ApplyTowerUpgrade();
 	bool IsUpgradableDefender(const ADefenderBase* Defender) const;
 	int32 GetUpgradeCostFor(const ADefenderBase* Defender) const;
 	int32 GetMaxUpgradeLevel(const ADefenderBase* Defender) const;
 	bool IsArcherDefender(const ADefenderBase* Defender) const;
+	int32 GetArcherUpgradePath(const ADefenderBase* Defender) const;
 	FText GetUpgradeBonusText(const ADefenderBase* Defender) const;
+	FText GetTowerUpgradeBonusText() const;
 	void ApplyChosenUpgrade(int32 Choice);
 	int32 GetBogCap() const;
 	int32 CountLivingBogs() const;
 	bool IsBogCapReached() const;
-	void PlayUpgradeSparkle(ADefenderBase* Defender);
+	void PlayUpgradeSparkle(AActor* Target);
 	void RefreshUpgradeMenu();
 };

@@ -6,6 +6,7 @@
 #include "EnemyTrojanHorse.h"
 #include "TDGameMode.h"
 #include "TDGameInstance.h"
+#include "TDPlayerController.h"
 #include "WeatherManager.h"
 
 AEnemySpawner::AEnemySpawner()
@@ -476,7 +477,13 @@ void AEnemySpawner::ApplyHealthScale(AEnemyBase* Enemy) const
 		break;
 	}
 
-	const float Scale = 1.f + Bonus;
+	float UpgradeBonus = 0.f;
+	if (const ATDPlayerController* Player = Cast<ATDPlayerController>(UGameplayStatics::GetPlayerController(this, 0)))
+	{
+		UpgradeBonus = FMath::Clamp(Player->GetPurchasedUpgradeCount() * 0.04f, 0.f, 0.60f);
+	}
+
+	const float Scale = 1.f + Bonus + UpgradeBonus;
 	Enemy->MaxHealth *= Scale;
 	Enemy->CurrentHealth = Enemy->MaxHealth;
 	Enemy->OnHealthChanged.Broadcast(Enemy->CurrentHealth, Enemy->MaxHealth);

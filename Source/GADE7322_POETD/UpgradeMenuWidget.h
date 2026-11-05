@@ -16,7 +16,7 @@ class GADE7322_POETD_API UUpgradeMenuWidget : public UUserWidget
 
 public:
 	void BindController(ATDPlayerController* InController);
-	void ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText);
+	void ShowForDefender(ADefenderBase* Defender, int32 Cost, int32 Level, int32 MaxLevel, bool bArcherChoice, const FText& BonusText, const FText& PrimaryButtonText);
 
 	virtual bool Initialize() override;
 

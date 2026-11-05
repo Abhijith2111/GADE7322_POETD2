@@ -80,6 +80,53 @@ void ADefenderMineShaft::BeginPlay()
 	}
 
 	Super::BeginPlay();
+	RestartIncomeTimer();
+}
+
+void ADefenderMineShaft::ApplyPayoutUpgrade()
+{
+	PayoutInterval = FMath::Max(4.f, PayoutInterval - 3.f);
+	RestartIncomeTimer();
+}
+
+void ADefenderMineShaft::ApplyRicherUpgrade()
+{
+	CoinsPerPayout += 10;
+}
+
+void ADefenderMineShaft::ApplyUpgradeVisual()
+{
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	UStaticMesh* Cart = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Cart.Cart"));
+	if (!Cart)
+	{
+		ShowUpgradeRing(1);
+		return;
+	}
+
+	const FVector FootprintAnchor = GetMeshFootprintAnchor();
+	const FVector OldScale = DefenderMesh->GetComponentScale();
+	const FBox OldBox = DefenderMesh->GetStaticMesh() ? DefenderMesh->GetStaticMesh()->GetBoundingBox() : FBox(FVector(-50.f), FVector(50.f));
+	const float OldWidth = FMath::Max(OldBox.GetSize().X * OldScale.X, OldBox.GetSize().Y * OldScale.Y);
+	const float OldHeight = FMath::Max(OldBox.GetSize().Z * OldScale.Z, 1.f);
+	DefenderMesh->SetStaticMesh(Cart);
+	const FBox NewBox = Cart->GetBoundingBox();
+	const float NewWidth = FMath::Max(FMath::Max(NewBox.GetSize().X, NewBox.GetSize().Y), 1.f);
+	const float NewHeight = FMath::Max(NewBox.GetSize().Z, 1.f);
+	DefenderMesh->SetWorldScale3D(FVector(OldWidth / NewWidth, OldWidth / NewWidth, OldHeight / NewHeight));
+	RefreshMeshPlacementAfterSwap(FootprintAnchor);
+}
+
+void ADefenderMineShaft::RestartIncomeTimer()
+{
+	if (!GetWorld())
+	{
+		return;
+	}
 
 	const float Interval = FMath::Max(PayoutInterval, 1.f);
 	GetWorldTimerManager().SetTimer(IncomeTimerHandle, this, &ADefenderMineShaft::GenerateIncome, Interval, true, Interval);

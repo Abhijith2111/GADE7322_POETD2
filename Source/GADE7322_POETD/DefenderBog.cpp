@@ -226,5 +226,6 @@ void ADefenderBog::ApplyUpgradeVisual()
 		DefenderMesh->SetStaticMesh(UpgradeMesh);
 		DefenderMesh->SetWorldScale3D(FVector(1.f));
 		RefreshMeshPlacementAfterSwap(FootprintAnchor);
+		GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadBogSlimeMaterial());
 	}
 }

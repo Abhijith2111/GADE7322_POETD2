@@ -127,6 +127,24 @@ void ACentralTowerBase::BeginPlay()
 	GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, Interval, true, 0.1f);
 }
 
+void ACentralTowerBase::ApplyPurchasedUpgrade(int32 NextLevel)
+{
+	MaxHealth += 100.f;
+	CurrentHealth = FMath::Min(CurrentHealth + 100.f, MaxHealth);
+	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
+	if (NextLevel <= 1)
+	{
+		AttackDamage += 8.f;
+	}
+	else
+	{
+		AttackInterval = FMath::Max(0.2f, AttackInterval * 0.8f);
+		const float Interval = FMath::Max(AttackInterval, 0.05f);
+		GetWorldTimerManager().SetTimer(AttackTimerHandle, this, &ACentralTowerBase::ScanAndAttack, Interval, true, Interval);
+	}
+	GameVFX::UpdateGoldRing(this, TowerMesh, UpgradeRing, NextLevel >= 2 ? 2 : 1);
+}
+
 void ACentralTowerBase::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
