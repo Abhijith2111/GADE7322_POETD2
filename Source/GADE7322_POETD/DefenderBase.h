@@ -31,7 +31,8 @@ protected:
 	AActor* FindNearestTarget() const;
 	void SeatMeshOnPivot();
 	void SnapToGround();
-	void RefreshMeshPlacementAfterSwap();
+	FVector GetMeshFootprintAnchor() const;
+	void RefreshMeshPlacementAfterSwap(const FVector& FootprintAnchor);
 
 public:
 	virtual void ApplyUpgradeVisual();

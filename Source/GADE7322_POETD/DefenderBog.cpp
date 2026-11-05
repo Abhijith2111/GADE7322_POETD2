@@ -202,8 +202,9 @@ void ADefenderBog::ApplyUpgradeVisual()
 
 	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/SpireT2.SpireT2")))
 	{
+		const FVector FootprintAnchor = GetMeshFootprintAnchor();
 		DefenderMesh->SetStaticMesh(UpgradeMesh);
 		DefenderMesh->SetWorldScale3D(FVector(1.f));
-		RefreshMeshPlacementAfterSwap();
+		RefreshMeshPlacementAfterSwap(FootprintAnchor);
 	}
 }

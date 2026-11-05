@@ -5,6 +5,7 @@
 #include "Components/Button.h"
 #include "Components/CanvasPanel.h"
 #include "Components/CanvasPanelSlot.h"
+#include "Components/ScrollBox.h"
 #include "Components/SizeBox.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBox.h"
@@ -53,6 +54,16 @@ namespace
 			"- Bog: pulls in and digests enemies (place off the path).\n"
 			"- Mine: support building. Upgrade Archer, Barracks, or Bog once for stronger stats.\n\n");
 
+		const FText Weather = NSLOCTEXT(
+			"Briefing",
+			"WeatherShared",
+			"\n\nWeather\n"
+			"Weather changes every 45 to 90 seconds. The current weather is shown at the top right.\n"
+			"- Sunny: no extra effect on attackers or defenders.\n"
+			"- Raining: the sky turns grey and rain falls. Bogs finish digesting 5 seconds sooner.\n"
+			"- Night: the map goes dark. Barracks take 5 seconds longer to train each knight. An attacker fighting your defenders sometimes strikes another attacker instead.\n"
+			"- Windy: wind crosses the map. About one in four archer shots goes astray and can hit another enemy, one of your own defenders, or miss.");
+
 		switch (Difficulty)
 		{
 		case ETDDifficulty::Medium:
@@ -67,8 +78,10 @@ namespace
 					"- Uses 3 lanes into the temple.\n\n"
 					"Limits\n"
 					"- You may place at most 5 bogs.\n"
-					"- Bog digestion takes about 45 seconds."),
-				Defenders);
+					"- Bog digestion takes about 45 seconds."
+					"{1}"),
+				Defenders,
+				Weather);
 		case ETDDifficulty::Hard:
 			return FText::Format(
 				NSLOCTEXT(
@@ -82,8 +95,10 @@ namespace
 					"- Enemies will hunt your mines.\n\n"
 					"Limits\n"
 					"- You may place at most 3 bogs.\n"
-					"- Bog digestion takes about 60 seconds."),
-				Defenders);
+					"- Bog digestion takes about 60 seconds."
+					"{1}"),
+				Defenders,
+				Weather);
 		default:
 			return FText::Format(
 				NSLOCTEXT(
@@ -96,8 +111,10 @@ namespace
 					"- Uses 3 lanes into the temple.\n\n"
 					"Limits\n"
 					"- No bog placement limit.\n"
-					"- Bog digestion takes about 20 seconds."),
-				Defenders);
+					"- Bog digestion takes about 20 seconds."
+					"{1}"),
+				Defenders,
+				Weather);
 		}
 	}
 }
@@ -145,6 +162,12 @@ void UDifficultyBriefingWidget::BuildWidget()
 	BodyText = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("BriefingBody"));
 	StyleBriefingText(BodyText, FText::GetEmpty(), 18.f, FLinearColor(0.92f, 0.92f, 0.95f, 1.f), true);
 
+	USizeBox* BodySize = WidgetTree->ConstructWidget<USizeBox>(USizeBox::StaticClass(), TEXT("BriefingBodySize"));
+	BodySize->SetMaxDesiredHeight(460.f);
+	UScrollBox* BodyScroll = WidgetTree->ConstructWidget<UScrollBox>(UScrollBox::StaticClass(), TEXT("BriefingBodyScroll"));
+	BodyScroll->AddChild(BodyText);
+	BodySize->AddChild(BodyScroll);
+
 	ContinueButton = WidgetTree->ConstructWidget<UButton>(UButton::StaticClass(), TEXT("ContinueButton"));
 	ContinueButton->SetBackgroundColor(FLinearColor(1.f, 0.55f, 0.05f, 1.f));
 	UTextBlock* ContinueLabel = WidgetTree->ConstructWidget<UTextBlock>(UTextBlock::StaticClass(), TEXT("ContinueLabel"));
@@ -162,7 +185,7 @@ void UDifficultyBriefingWidget::BuildWidget()
 	};
 
 	AddRow(TitleText, 8.f);
-	AddRow(BodyText, 16.f);
+	AddRow(BodySize, 16.f);
 	if (UVerticalBoxSlot* ButtonSlot = Column->AddChildToVerticalBox(ContinueButton))
 	{
 		ButtonSlot->SetPadding(FMargin(28.f, 8.f, 28.f, 28.f));

@@ -780,96 +780,14 @@ void AProceduralTerrain::DrawDebugVisualization()
 
 void AProceduralTerrain::ResolvePathMeshes()
 {
-	auto LoadNamed = [](const TCHAR* Path) -> UStaticMesh*
-	{
-		return LoadObject<UStaticMesh>(nullptr, Path);
-	};
+	TurnLeftPathMesh = nullptr;
+	TurnRightPathMesh = nullptr;
+	TJunctionPathMesh = nullptr;
+	CrossPathMesh = nullptr;
 
-	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_StraightPath.SM_StraightPath")))
+	if (UStaticMesh* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Enviroment/SM_TerrainFlatDirt.SM_TerrainFlatDirt")))
 	{
 		StraightPathMesh = Mesh;
-	}
-	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathLeft.SM_PathLeft")))
-	{
-		TurnLeftPathMesh = Mesh;
-	}
-	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathRight.SM_PathRight")))
-	{
-		TurnRightPathMesh = Mesh;
-	}
-	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/SM_PathTJunction.SM_PathTJunction")))
-	{
-		TJunctionPathMesh = Mesh;
-	}
-	if (UStaticMesh* Mesh = LoadNamed(TEXT("/Game/Enviroment/Path_Cross_.Path_Cross_")))
-	{
-		CrossPathMesh = Mesh;
-	}
-}
-
-namespace
-{
-	struct FPathSockets
-	{
-		uint8 N = 0;
-		uint8 E = 0;
-		uint8 S = 0;
-		uint8 W = 0;
-
-		bool operator==(const FPathSockets& Other) const
-		{
-			return N == Other.N && E == Other.E && S == Other.S && W == Other.W;
-		}
-	};
-
-	FPathSockets RotateSockets(FPathSockets Sockets, int32 QuarterTurns)
-	{
-		const int32 Steps = ((QuarterTurns % 4) + 4) % 4;
-		for (int32 Step = 0; Step < Steps; ++Step)
-		{
-			const FPathSockets Next{ Sockets.E, Sockets.S, Sockets.W, Sockets.N };
-			Sockets = Next;
-		}
-		return Sockets;
-	}
-
-	FPathSockets SocketsFromNeighbors(const TArray<FIntPoint, TInlineAllocator<4>>& Neighbors)
-	{
-		FPathSockets Sockets;
-		for (const FIntPoint& Dir : Neighbors)
-		{
-			if (Dir.Y == 1) Sockets.N = 1;
-			else if (Dir.X == 1) Sockets.E = 1;
-			else if (Dir.Y == -1) Sockets.S = 1;
-			else if (Dir.X == -1) Sockets.W = 1;
-		}
-		return Sockets;
-	}
-
-	bool SocketsCover(const FPathSockets& Tile, const FPathSockets& Required, bool bExact)
-	{
-		if (bExact)
-		{
-			return Tile == Required;
-		}
-		if (Required.N && !Tile.N) return false;
-		if (Required.E && !Tile.E) return false;
-		if (Required.S && !Tile.S) return false;
-		if (Required.W && !Tile.W) return false;
-		return true;
-	}
-
-	bool FindSocketYaw(const FPathSockets& Base, const FPathSockets& Required, bool bExact, float YawOffset, float& OutYaw)
-	{
-		for (int32 Step = 0; Step < 4; ++Step)
-		{
-			if (SocketsCover(RotateSockets(Base, Step), Required, bExact))
-			{
-				OutYaw = Step * 90.f + YawOffset;
-				return true;
-			}
-		}
-		return false;
 	}
 }
 
@@ -926,91 +844,19 @@ void AProceduralTerrain::SpawnPathTiles()
 		CrossTileISM->ClearInstances();
 	}
 
-	if (StraightPathMesh) StraightTileISM->SetStaticMesh(StraightPathMesh);
-	if (TurnLeftPathMesh) TurnLeftTileISM->SetStaticMesh(TurnLeftPathMesh);
-	if (TurnRightPathMesh) TurnRightTileISM->SetStaticMesh(TurnRightPathMesh);
-	if (TJunctionPathMesh) TJunctionTileISM->SetStaticMesh(TJunctionPathMesh);
-	if (CrossPathMesh && CrossTileISM) CrossTileISM->SetStaticMesh(CrossPathMesh);
+	if (StraightPathMesh)
+	{
+		StraightTileISM->SetStaticMesh(StraightPathMesh);
+	}
 
 	PlacedTileCells.Empty();
 
-	static const FIntPoint Cardinals[] = { FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1) };
 	const float PathZ = FMath::Max(PathTileZOffset, GroundTileZOffset + 4.f);
 	constexpr float PathFit = 1.f;
 
-	const FPathSockets StraightSockets{ 0, 1, 0, 1 };
-	const FPathSockets LeftSockets{ 1, 1, 0, 0 };
-	const FPathSockets RightSockets{ 0, 1, 1, 0 };
-	const FPathSockets JunctionSockets{ 0, 1, 1, 1 };
-
-	auto PlaceCorner = [&](const FPathSockets& Required, float& OutYaw, UInstancedStaticMeshComponent*& OutISM)
-	{
-		if (TurnLeftTileISM && TurnLeftTileISM->GetStaticMesh() && FindSocketYaw(LeftSockets, Required, true, PathTileYawOffset, OutYaw))
-		{
-			OutISM = TurnLeftTileISM;
-			return;
-		}
-		if (TurnRightTileISM && TurnRightTileISM->GetStaticMesh() && FindSocketYaw(RightSockets, Required, true, PathTileYawOffset, OutYaw))
-		{
-			OutISM = TurnRightTileISM;
-			return;
-		}
-		OutYaw = PathTileYawOffset;
-		OutISM = StraightTileISM;
-	};
-
 	for (const FIntPoint& Cell : PathCellSet)
 	{
-		TArray<FIntPoint, TInlineAllocator<4>> NeighborDirs;
-		for (const FIntPoint& Dir : Cardinals)
-		{
-			if (PathCellSet.Contains(Cell + Dir))
-			{
-				NeighborDirs.Add(Dir);
-			}
-		}
-
-		UInstancedStaticMeshComponent* TileISM = StraightTileISM;
-		float Yaw = PathTileYawOffset;
-		const FPathSockets Required = SocketsFromNeighbors(NeighborDirs);
-		const bool bOpposite = NeighborDirs.Num() == 2 && NeighborDirs[0] + NeighborDirs[1] == FIntPoint(0, 0);
-
-		if (NeighborDirs.Num() == 0)
-		{
-			Yaw = PathTileYawOffset;
-			TileISM = StraightTileISM;
-		}
-		else if (NeighborDirs.Num() == 1 || bOpposite)
-		{
-			if (!FindSocketYaw(StraightSockets, Required, NeighborDirs.Num() == 2, PathTileYawOffset, Yaw))
-			{
-				Yaw = PathTileYawOffset;
-			}
-			TileISM = StraightTileISM;
-		}
-		else if (NeighborDirs.Num() == 2)
-		{
-			PlaceCorner(Required, Yaw, TileISM);
-		}
-		else if (NeighborDirs.Num() == 3 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
-		{
-			if (!FindSocketYaw(JunctionSockets, Required, true, PathTileYawOffset, Yaw))
-			{
-				Yaw = PathTileYawOffset;
-			}
-			TileISM = TJunctionTileISM;
-		}
-		else if (NeighborDirs.Num() >= 4 && CrossTileISM && CrossTileISM->GetStaticMesh())
-		{
-			Yaw = PathTileYawOffset;
-			TileISM = CrossTileISM;
-		}
-		else if (NeighborDirs.Num() >= 2)
-		{
-			PlaceCorner(Required, Yaw, TileISM);
-		}
-
-		SpawnTileInstance(TileISM, Cell, Yaw, PathZ, PathFit);
+		SpawnTileInstance(StraightTileISM, Cell, PathTileYawOffset, PathZ, PathFit);
 		PlacedTileCells.Add(Cell);
 	}
 }
