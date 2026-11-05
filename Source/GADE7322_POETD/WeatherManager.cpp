@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "ProceduralTerrain.h"
 #include "TDGameState.h"
 #include "TimerManager.h"
 
@@ -451,24 +452,32 @@ void AWeatherManager::UpdateWindStreaks(float DeltaSeconds)
 
 FVector AWeatherManager::MakeRainDropSpawnLocation(bool bAtTop) const
 {
-	const FVector Origin = GetActorLocation();
-	const float Angle = FMath::FRandRange(0.f, 2.f * PI);
-	const float Radius = FMath::FRandRange(0.f, RainVolumeRadius);
+	FVector Min(0.f, 0.f, 0.f);
+	FVector Max(4000.f, 4000.f, 0.f);
+	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
+	{
+		const FVector First = Terrain->GridToWorldLocation(0, 0);
+		const FVector Last = Terrain->GridToWorldLocation(FMath::Max(Terrain->GridWidth - 1, 0), FMath::Max(Terrain->GridHeight - 1, 0));
+		const FVector Half(Terrain->TileDimensions.X * 0.5f, Terrain->TileDimensions.Y * 0.5f, 0.f);
+		Min = FVector(FMath::Min(First.X, Last.X), FMath::Min(First.Y, Last.Y), 0.f) - Half;
+		Max = FVector(FMath::Max(First.X, Last.X), FMath::Max(First.Y, Last.Y), 0.f) + Half;
+	}
+
 	const float Height = bAtTop
 		? FMath::FRandRange(RainMaxZ - 120.f, RainMaxZ)
-		: FMath::FRandRange(180.f, RainMaxZ);
-	return Origin + FVector(FMath::Cos(Angle) * Radius, FMath::Sin(Angle) * Radius, Height);
+		: FMath::FRandRange(RainMinZ, RainMaxZ);
+	return FVector(FMath::FRandRange(Min.X, Max.X), FMath::FRandRange(Min.Y, Max.Y), Height);
 }
 
 void AWeatherManager::BuildRainDrops()
 {
-	UStaticMesh* Cube = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	UStaticMesh* Sphere = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Sphere.Sphere"));
 	UMaterialInterface* RainMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_RainDrop.M_RainDrop"));
 	if (!RainMat)
 	{
 		RainMat = LoadObject<UMaterialInterface>(nullptr, TEXT("/Game/VFX/M_WindStreak.M_WindStreak"));
 	}
-	UMaterialInterface* FallbackMat = Cube ? Cube->GetMaterial(0) : nullptr;
+	UMaterialInterface* FallbackMat = Sphere ? Sphere->GetMaterial(0) : nullptr;
 	UMaterialInterface* UseMat = RainMat ? RainMat : FallbackMat;
 	const FLinearColor DropColor(0.75f, 0.88f, 1.f, 1.f);
 
@@ -482,7 +491,7 @@ void AWeatherManager::BuildRainDrops()
 	RainDropMeshes.Reset();
 	RainDropData.Reset();
 
-	for (int32 Index = 0; Index < 140; ++Index)
+	for (int32 Index = 0; Index < 240; ++Index)
 	{
 		UStaticMeshComponent* Drop = NewObject<UStaticMeshComponent>(this);
 		Drop->SetupAttachment(Root);
@@ -491,9 +500,9 @@ void AWeatherManager::BuildRainDrops()
 		Drop->SetCastShadow(false);
 		Drop->SetAbsolute(true, true, true);
 		Drop->SetHiddenInGame(false);
-		if (Cube)
+		if (Sphere)
 		{
-			Drop->SetStaticMesh(Cube);
+			Drop->SetStaticMesh(Sphere);
 		}
 
 		FRainDropData Data;
@@ -501,10 +510,9 @@ void AWeatherManager::BuildRainDrops()
 		Data.DriftX = FMath::FRandRange(-80.f, 80.f);
 		Data.DriftY = FMath::FRandRange(-80.f, 80.f);
 
-		const float Thickness = FMath::FRandRange(0.18f, 0.4f);
-		const float Length = FMath::FRandRange(2.8f, 6.5f);
-		Drop->SetWorldScale3D(FVector(Thickness, Thickness, Length));
-		Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
+		const float Scale = FMath::FRandRange(0.18f, 0.32f);
+		Drop->SetWorldScale3D(FVector(Scale));
+		Drop->SetWorldRotation(FRotator::ZeroRotator);
 		Drop->SetWorldLocation(MakeRainDropSpawnLocation(false));
 		if (UseMat)
 		{
@@ -546,7 +554,7 @@ void AWeatherManager::ResetRainDropPositions()
 		}
 
 		Drop->SetWorldLocation(MakeRainDropSpawnLocation(false));
-		Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
+		Drop->SetWorldRotation(FRotator::ZeroRotator);
 		if (Index < RainDropData.Num())
 		{
 			RainDropData[Index].FallSpeed = FMath::FRandRange(850.f, 1600.f);
@@ -575,7 +583,7 @@ void AWeatherManager::UpdateRainDrops(float DeltaSeconds)
 		if (Location.Z < RainMinZ)
 		{
 			Location = MakeRainDropSpawnLocation(true);
-			Drop->SetWorldRotation(FRotator(FMath::FRandRange(-18.f, 18.f), FMath::FRandRange(0.f, 360.f), FMath::FRandRange(-12.f, 12.f)));
+			Drop->SetWorldRotation(FRotator::ZeroRotator);
 		}
 
 		Drop->SetWorldLocation(Location);

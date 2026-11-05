@@ -421,6 +421,7 @@ void AProceduralTerrain::GeneratePathways()
 
 	TMap<int32, int32> EdgeLaneCount;
 	TMap<int32, TSet<int32>> UsedSlotsByEdge;
+	TMap<int32, TSet<int32>> UsedSlotsByAxis;
 	static const FColor PathColors[] = { FColor::Red, FColor::Blue, FColor::Yellow, FColor::Cyan, FColor::Magenta, FColor::Orange };
 
 	auto AppendStraight = [](TArray<FIntPoint>& Cells, FIntPoint From, FIntPoint To)
@@ -444,15 +445,17 @@ void AProceduralTerrain::GeneratePathways()
 		}
 	};
 
-	auto PickOffset = [this, &CenterCell, &UsedSlotsByEdge](int32 Edge, bool bHorizontalEdge, int32 LaneOnEdge) -> int32
+	auto PickOffset = [this, &CenterCell, &UsedSlotsByEdge, &UsedSlotsByAxis](int32 Edge, bool bHorizontalEdge, int32 LaneOnEdge) -> int32
 	{
-		const TSet<int32>& UsedSlots = UsedSlotsByEdge.FindOrAdd(Edge);
+		const int32 Axis = bHorizontalEdge ? 0 : 1;
+		const TSet<int32>& EdgeSlots = UsedSlotsByEdge.FindOrAdd(Edge);
+		const TSet<int32>& AxisSlots = UsedSlotsByAxis.FindOrAdd(Axis);
 		TArray<int32, TInlineAllocator<8>> Candidates;
 		if (LaneOnEdge == 0)
 		{
 			Candidates.Add(0);
 		}
-		for (int32 Step = 1; Step <= 4; ++Step)
+		for (int32 Step = 2; Step <= 4; ++Step)
 		{
 			Candidates.Add(Step);
 			Candidates.Add(-Step);
@@ -462,12 +465,28 @@ void AProceduralTerrain::GeneratePathways()
 			Candidates.Add(0);
 		}
 
+		auto SlotBlocked = [&EdgeSlots, &AxisSlots](int32 Slot) -> bool
+		{
+			if (EdgeSlots.Contains(Slot))
+			{
+				return true;
+			}
+			for (const int32 Used : AxisSlots)
+			{
+				if (FMath::Abs(Used - Slot) == 1)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+
 		for (const int32 Offset : Candidates)
 		{
 			if (bHorizontalEdge)
 			{
 				const int32 Column = CenterCell.X + Offset;
-				if (Column >= 0 && Column < GridWidth && !UsedSlots.Contains(Column))
+				if (Column >= 0 && Column < GridWidth && !SlotBlocked(Column))
 				{
 					return Offset;
 				}
@@ -475,7 +494,7 @@ void AProceduralTerrain::GeneratePathways()
 			else
 			{
 				const int32 Row = CenterCell.Y + Offset;
-				if (Row >= 0 && Row < GridHeight && !UsedSlots.Contains(Row))
+				if (Row >= 0 && Row < GridHeight && !SlotBlocked(Row))
 				{
 					return Offset;
 				}
@@ -498,12 +517,14 @@ void AProceduralTerrain::GeneratePathways()
 			const int32 Column = FMath::Clamp(CenterCell.X + Offset, 0, GridWidth - 1);
 			Offset = Column - CenterCell.X;
 			UsedSlotsByEdge.FindOrAdd(Edge).Add(Column);
+			UsedSlotsByAxis.FindOrAdd(0).Add(Column);
 		}
 		else
 		{
 			const int32 Row = FMath::Clamp(CenterCell.Y + Offset, 0, GridHeight - 1);
 			Offset = Row - CenterCell.Y;
 			UsedSlotsByEdge.FindOrAdd(Edge).Add(Row);
+			UsedSlotsByAxis.FindOrAdd(1).Add(Row);
 		}
 
 		FIntPoint Start;
@@ -534,6 +555,137 @@ void AProceduralTerrain::GeneratePathways()
 		if (Mid != CenterCell)
 		{
 			AppendStraight(Cells, Mid, CenterCell);
+		}
+
+		if (Cells.Num() >= 6)
+		{
+			const int32 JogIndex = RandomStream.RandRange(2, Cells.Num() - 3);
+			const FIntPoint Travel = Cells[JogIndex] - Cells[JogIndex - 1];
+			if (Travel.X != 0 || Travel.Y != 0)
+			{
+				FIntPoint Sides[2] = {
+					FIntPoint(Travel.Y, -Travel.X),
+					FIntPoint(-Travel.Y, Travel.X)
+				};
+				if (RandomStream.RandRange(0, 1) == 1)
+				{
+					Swap(Sides[0], Sides[1]);
+				}
+
+				auto TryJog = [&](const FIntPoint& Side, TArray<FIntPoint>& OutCells) -> bool
+				{
+					OutCells.Reset();
+					OutCells.Append(Cells.GetData(), JogIndex + 1);
+					const FIntPoint Corner = Cells[JogIndex];
+					const bool bTravelX = Travel.X != 0;
+
+					auto InGrid = [this](const FIntPoint& P)
+					{
+						return P.X >= 0 && P.Y >= 0 && P.X < GridWidth && P.Y < GridHeight;
+					};
+					auto BlocksLane = [&](const FIntPoint& P)
+					{
+						if (PathCellSet.Contains(P) && P != CenterCell)
+						{
+							return true;
+						}
+						static const FIntPoint Cardinals[] = {
+							FIntPoint(1, 0), FIntPoint(-1, 0), FIntPoint(0, 1), FIntPoint(0, -1)
+						};
+						for (const FIntPoint& Dir : Cardinals)
+						{
+							const FIntPoint Neighbor = P + Dir;
+							if (Neighbor == Corner)
+							{
+								continue;
+							}
+							if (PathCellSet.Contains(Neighbor) && Neighbor != CenterCell)
+							{
+								return true;
+							}
+							for (int32 HeadIndex = 0; HeadIndex < JogIndex; ++HeadIndex)
+							{
+								if (Cells[HeadIndex] == Neighbor)
+								{
+									return true;
+								}
+							}
+						}
+						for (int32 HeadIndex = 0; HeadIndex < JogIndex; ++HeadIndex)
+						{
+							if (Cells[HeadIndex] == P)
+							{
+								return true;
+							}
+						}
+						return false;
+					};
+
+					TArray<FIntPoint> Shifted;
+					FIntPoint Cursor = Corner + Side;
+					if (!InGrid(Cursor))
+					{
+						return false;
+					}
+					Shifted.Add(Cursor);
+					while ((bTravelX ? Cursor.X : Cursor.Y) != (bTravelX ? CenterCell.X : CenterCell.Y))
+					{
+						if (bTravelX)
+						{
+							Cursor.X += FMath::Sign(CenterCell.X - Cursor.X);
+						}
+						else
+						{
+							Cursor.Y += FMath::Sign(CenterCell.Y - Cursor.Y);
+						}
+						if (!InGrid(Cursor))
+						{
+							return false;
+						}
+						Shifted.Add(Cursor);
+					}
+
+					TArray<FIntPoint> Join;
+					while (Cursor != CenterCell)
+					{
+						if (bTravelX)
+						{
+							Cursor.Y += FMath::Sign(CenterCell.Y - Cursor.Y);
+						}
+						else
+						{
+							Cursor.X += FMath::Sign(CenterCell.X - Cursor.X);
+						}
+						if (!InGrid(Cursor))
+						{
+							return false;
+						}
+						Join.Add(Cursor);
+					}
+
+					for (const FIntPoint& P : Shifted)
+					{
+						if (BlocksLane(P))
+						{
+							return false;
+						}
+					}
+
+					OutCells.Append(Shifted);
+					OutCells.Append(Join);
+					return OutCells.Num() > JogIndex + 1;
+				};
+
+				TArray<FIntPoint> Jogged;
+				for (const FIntPoint& Side : Sides)
+				{
+					if (TryJog(Side, Jogged))
+					{
+						Cells = Jogged;
+						break;
+					}
+				}
+			}
 		}
 
 		FProceduralPathway NewPath;
@@ -655,6 +807,72 @@ void AProceduralTerrain::ResolvePathMeshes()
 	}
 }
 
+namespace
+{
+	struct FPathSockets
+	{
+		uint8 N = 0;
+		uint8 E = 0;
+		uint8 S = 0;
+		uint8 W = 0;
+
+		bool operator==(const FPathSockets& Other) const
+		{
+			return N == Other.N && E == Other.E && S == Other.S && W == Other.W;
+		}
+	};
+
+	FPathSockets RotateSockets(FPathSockets Sockets, int32 QuarterTurns)
+	{
+		const int32 Steps = ((QuarterTurns % 4) + 4) % 4;
+		for (int32 Step = 0; Step < Steps; ++Step)
+		{
+			const FPathSockets Next{ Sockets.E, Sockets.S, Sockets.W, Sockets.N };
+			Sockets = Next;
+		}
+		return Sockets;
+	}
+
+	FPathSockets SocketsFromNeighbors(const TArray<FIntPoint, TInlineAllocator<4>>& Neighbors)
+	{
+		FPathSockets Sockets;
+		for (const FIntPoint& Dir : Neighbors)
+		{
+			if (Dir.Y == 1) Sockets.N = 1;
+			else if (Dir.X == 1) Sockets.E = 1;
+			else if (Dir.Y == -1) Sockets.S = 1;
+			else if (Dir.X == -1) Sockets.W = 1;
+		}
+		return Sockets;
+	}
+
+	bool SocketsCover(const FPathSockets& Tile, const FPathSockets& Required, bool bExact)
+	{
+		if (bExact)
+		{
+			return Tile == Required;
+		}
+		if (Required.N && !Tile.N) return false;
+		if (Required.E && !Tile.E) return false;
+		if (Required.S && !Tile.S) return false;
+		if (Required.W && !Tile.W) return false;
+		return true;
+	}
+
+	bool FindSocketYaw(const FPathSockets& Base, const FPathSockets& Required, bool bExact, float YawOffset, float& OutYaw)
+	{
+		for (int32 Step = 0; Step < 4; ++Step)
+		{
+			if (SocketsCover(RotateSockets(Base, Step), Required, bExact))
+			{
+				OutYaw = Step * 90.f + YawOffset;
+				return true;
+			}
+		}
+		return false;
+	}
+}
+
 float AProceduralTerrain::YawForDirection(const FIntPoint& Dir) const
 {
 	if (Dir.X == 1) return 0.f;
@@ -720,19 +938,25 @@ void AProceduralTerrain::SpawnPathTiles()
 	const float PathZ = FMath::Max(PathTileZOffset, GroundTileZOffset + 4.f);
 	constexpr float PathFit = 1.f;
 
-	auto PickTurnISM = [this](int32 CrossZ) -> UInstancedStaticMeshComponent*
+	const FPathSockets StraightSockets{ 0, 1, 0, 1 };
+	const FPathSockets LeftSockets{ 1, 1, 0, 0 };
+	const FPathSockets RightSockets{ 0, 1, 1, 0 };
+	const FPathSockets JunctionSockets{ 0, 1, 1, 1 };
+
+	auto PlaceCorner = [&](const FPathSockets& Required, float& OutYaw, UInstancedStaticMeshComponent*& OutISM)
 	{
-		UInstancedStaticMeshComponent* Preferred = (CrossZ > 0) ? TurnRightTileISM : TurnLeftTileISM;
-		if (Preferred && Preferred->GetStaticMesh())
+		if (TurnLeftTileISM && TurnLeftTileISM->GetStaticMesh() && FindSocketYaw(LeftSockets, Required, true, PathTileYawOffset, OutYaw))
 		{
-			return Preferred;
+			OutISM = TurnLeftTileISM;
+			return;
 		}
-		Preferred = (CrossZ > 0) ? TurnLeftTileISM : TurnRightTileISM;
-		if (Preferred && Preferred->GetStaticMesh())
+		if (TurnRightTileISM && TurnRightTileISM->GetStaticMesh() && FindSocketYaw(RightSockets, Required, true, PathTileYawOffset, OutYaw))
 		{
-			return Preferred;
+			OutISM = TurnRightTileISM;
+			return;
 		}
-		return StraightTileISM;
+		OutYaw = PathTileYawOffset;
+		OutISM = StraightTileISM;
 	};
 
 	for (const FIntPoint& Cell : PathCellSet)
@@ -748,44 +972,32 @@ void AProceduralTerrain::SpawnPathTiles()
 
 		UInstancedStaticMeshComponent* TileISM = StraightTileISM;
 		float Yaw = PathTileYawOffset;
+		const FPathSockets Required = SocketsFromNeighbors(NeighborDirs);
+		const bool bOpposite = NeighborDirs.Num() == 2 && NeighborDirs[0] + NeighborDirs[1] == FIntPoint(0, 0);
 
 		if (NeighborDirs.Num() == 0)
 		{
 			Yaw = PathTileYawOffset;
 			TileISM = StraightTileISM;
 		}
-		else if (NeighborDirs.Num() == 1 ||
-			(NeighborDirs.Num() == 2 && NeighborDirs[0] + NeighborDirs[1] == FIntPoint(0, 0)))
+		else if (NeighborDirs.Num() == 1 || bOpposite)
 		{
-			Yaw = YawForDirection(NeighborDirs[0]) + 90.f + PathTileYawOffset;
+			if (!FindSocketYaw(StraightSockets, Required, NeighborDirs.Num() == 2, PathTileYawOffset, Yaw))
+			{
+				Yaw = PathTileYawOffset;
+			}
 			TileISM = StraightTileISM;
 		}
 		else if (NeighborDirs.Num() == 2)
 		{
-			FIntPoint InDir(-NeighborDirs[0].X, -NeighborDirs[0].Y);
-			FIntPoint OutDir = NeighborDirs[1];
-			int32 CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
-			if (CrossZ == 0)
-			{
-				InDir = FIntPoint(-NeighborDirs[1].X, -NeighborDirs[1].Y);
-				OutDir = NeighborDirs[0];
-				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
-			}
-			Yaw = YawForDirection(InDir) + 90.f + PathTileYawOffset;
-			TileISM = PickTurnISM(CrossZ);
+			PlaceCorner(Required, Yaw, TileISM);
 		}
 		else if (NeighborDirs.Num() == 3 && TJunctionTileISM && TJunctionTileISM->GetStaticMesh())
 		{
-			FIntPoint Missing(0, 0);
-			for (const FIntPoint& Dir : Cardinals)
+			if (!FindSocketYaw(JunctionSockets, Required, true, PathTileYawOffset, Yaw))
 			{
-				if (!NeighborDirs.Contains(Dir))
-				{
-					Missing = Dir;
-					break;
-				}
+				Yaw = PathTileYawOffset;
 			}
-			Yaw = YawForDirection(Missing) - 90.f + PathTileYawOffset;
 			TileISM = TJunctionTileISM;
 		}
 		else if (NeighborDirs.Num() >= 4 && CrossTileISM && CrossTileISM->GetStaticMesh())
@@ -793,35 +1005,9 @@ void AProceduralTerrain::SpawnPathTiles()
 			Yaw = PathTileYawOffset;
 			TileISM = CrossTileISM;
 		}
-		else
+		else if (NeighborDirs.Num() >= 2)
 		{
-			FIntPoint DirA = NeighborDirs[0];
-			FIntPoint DirB = NeighborDirs[1];
-			for (int32 i = 0; i < NeighborDirs.Num(); ++i)
-			{
-				for (int32 j = i + 1; j < NeighborDirs.Num(); ++j)
-				{
-					if (NeighborDirs[i].X * NeighborDirs[j].X + NeighborDirs[i].Y * NeighborDirs[j].Y == 0)
-					{
-						DirA = NeighborDirs[i];
-						DirB = NeighborDirs[j];
-						i = NeighborDirs.Num();
-						break;
-					}
-				}
-			}
-
-			FIntPoint InDir(-DirA.X, -DirA.Y);
-			FIntPoint OutDir = DirB;
-			int32 CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
-			if (CrossZ == 0)
-			{
-				InDir = FIntPoint(-DirB.X, -DirB.Y);
-				OutDir = DirA;
-				CrossZ = InDir.X * OutDir.Y - InDir.Y * OutDir.X;
-			}
-			Yaw = YawForDirection(InDir) + 90.f + PathTileYawOffset;
-			TileISM = PickTurnISM(CrossZ);
+			PlaceCorner(Required, Yaw, TileISM);
 		}
 
 		SpawnTileInstance(TileISM, Cell, Yaw, PathZ, PathFit);
