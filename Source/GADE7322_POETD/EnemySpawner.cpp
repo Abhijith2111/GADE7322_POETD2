@@ -8,6 +8,7 @@
 #include "TDGameInstance.h"
 #include "TDPlayerController.h"
 #include "WeatherManager.h"
+#include "CentralTowerBase.h"
 
 AEnemySpawner::AEnemySpawner()
 {
@@ -414,6 +415,9 @@ void AEnemySpawner::SpawnEnemyOnLane(TSubclassOf<AEnemyBase> ClassToSpawn, int32
 
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(this);
+	TArray<AActor*> Towers;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ACentralTowerBase::StaticClass(), Towers);
+	QueryParams.AddIgnoredActors(Towers);
 
 	for (int32 Index = EntryIndex; Index < Waypoints.Num(); ++Index)
 	{

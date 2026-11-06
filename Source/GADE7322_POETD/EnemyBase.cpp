@@ -25,12 +25,12 @@ AEnemyBase::AEnemyBase()
 	AutoPossessAI = EAutoPossessAI::Disabled;
 	AIControllerClass = nullptr;
 
-	GetCharacterMovement()->DefaultLandMovementMode = MOVE_Walking;
+	GetCharacterMovement()->DefaultLandMovementMode = MOVE_Flying;
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	GetCharacterMovement()->bUseControllerDesiredRotation = false;
 	GetCharacterMovement()->RotationRate = FRotator(0.f, 360.f, 0.f);
-	GetCharacterMovement()->GravityScale = 1.f;
+	GetCharacterMovement()->GravityScale = 0.f;
 	GetCharacterMovement()->bConstrainToPlane = false;
 	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 
@@ -52,7 +52,9 @@ void AEnemyBase::BeginPlay()
 	bIsAttacking = false;
 
 	GetCharacterMovement()->MaxWalkSpeed = MoveSpeed;
-	GetCharacterMovement()->SetMovementMode(MOVE_Walking);
+	GetCharacterMovement()->MaxFlySpeed = MoveSpeed;
+	GetCharacterMovement()->GravityScale = 0.f;
+	GetCharacterMovement()->SetMovementMode(MOVE_Flying);
 	GetCharacterMovement()->bRunPhysicsWithNoController = true;
 
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
@@ -78,7 +80,14 @@ void AEnemyBase::ApplyGruntCube()
 		return;
 	}
 
-	UStaticMesh* BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Characters/EnemyKnight_N_.EnemyKnight_N_"));
+	const TCHAR* MeshPath = bCartPassenger
+		? TEXT("/Game/Characters/CartEnemy_N_.CartEnemy_N_")
+		: TEXT("/Game/Characters/EnemyKnight_N_.EnemyKnight_N_");
+	UStaticMesh* BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, MeshPath);
+	if (!BodyMeshAsset)
+	{
+		BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Characters/EnemyKnight_N_.EnemyKnight_N_"));
+	}
 	if (!BodyMeshAsset)
 	{
 		BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
@@ -108,9 +117,7 @@ void AEnemyBase::ApplyGruntCube()
 	const FBox MeshBox = BodyMeshAsset->GetBoundingBox();
 	const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
 	const float Uniform = 110.f / MeshHeight;
-	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.f;
-	const float ScaledHeight = MeshHeight * Uniform;
-	const FVector MeshOffset(0.f, 0.f, -HalfHeight - MeshBox.Min.Z * Uniform + ScaledHeight + 6.f);
+	const FVector MeshOffset(0.f, 0.f, 20.f - MeshBox.Min.Z * Uniform);
 
 	for (UStaticMeshComponent* MeshComp : MeshComponents)
 	{
@@ -130,6 +137,11 @@ void AEnemyBase::ApplyGruntCube()
 		const float HeadZ = MeshOffset.Z + MeshBox.Max.Z * Uniform;
 		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, HeadZ + 16.f), FVector2D(120.f, 16.f));
 	}
+}
+
+void AEnemyBase::PrepareCartPassenger()
+{
+	bCartPassenger = true;
 }
 
 void AEnemyBase::PlayHitFlash()
@@ -152,9 +164,65 @@ void AEnemyBase::InitialiseWithWaypoints(const TArray<FVector>& InWaypoints)
 	UE_LOG(LogTemp, Log, TEXT("EnemyBase %s initialised with %d waypoints"), *GetName(), Waypoints.Num());
 }
 
+float AEnemyBase::GetMeshBottomOffset() const
+{
+	float Lowest = 0.f;
+	float LowestHeight = 0.f;
+	bool bFound = false;
+	TArray<UStaticMeshComponent*> Meshes;
+	GetComponents<UStaticMeshComponent>(Meshes);
+	for (UStaticMeshComponent* Body : Meshes)
+	{
+		if (!Body || !Body->IsVisible() || !Body->GetStaticMesh())
+		{
+			continue;
+		}
+
+		const FBox Box = Body->GetStaticMesh()->GetBoundingBox();
+		const float ScaleZ = FMath::Abs(Body->GetRelativeScale3D().Z);
+		const float Bottom = Body->GetRelativeLocation().Z + Box.Min.Z * ScaleZ;
+		if (!bFound || Bottom < Lowest)
+		{
+			Lowest = Bottom;
+			LowestHeight = Box.GetSize().Z * ScaleZ;
+			bFound = true;
+		}
+	}
+
+	return bFound ? Lowest + LowestHeight * 0.5f : 0.f;
+}
+
+void AEnemyBase::KeepAboveGround()
+{
+	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
+	{
+		Movement->GravityScale = 0.f;
+		Movement->MaxFlySpeed = MoveSpeed;
+		if (Movement->MovementMode != MOVE_Flying && !bIsBeingEaten)
+		{
+			Movement->SetMovementMode(MOVE_Flying);
+		}
+	}
+
+	if (Waypoints.Num() == 0)
+	{
+		return;
+	}
+
+	float PathZ = Waypoints[0].Z;
+	for (const FVector& Point : Waypoints)
+	{
+		PathZ = FMath::Min(PathZ, Point.Z);
+	}
+	const float GroundZ = PathZ - 90.f;
+	const FVector Loc = GetActorLocation();
+	SetActorLocation(FVector(Loc.X, Loc.Y, GroundZ + 8.f - GetMeshBottomOffset()), false);
+}
+
 void AEnemyBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	KeepAboveGround();
 
 	if (bIsDefeated || !bWaypointsInitialised)
 	{
@@ -203,7 +271,9 @@ void AEnemyBase::ConvertToBogAlly()
 	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
-		Movement->SetMovementMode(MOVE_Walking);
+		Movement->GravityScale = 0.f;
+		Movement->MaxFlySpeed = MoveSpeed;
+		Movement->SetMovementMode(MOVE_Flying);
 		Movement->bRunPhysicsWithNoController = true;
 	}
 }
@@ -277,7 +347,7 @@ bool AEnemyBase::UpdateBogAllyBehavior()
 	AEnemyBase* Strike = FindNearestHostile(AttackRange);
 	if (Chase && !Strike)
 	{
-		AddMovementInput((Chase->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+		AddMovementInput(SteerAroundTower((Chase->GetActorLocation() - GetActorLocation()).GetSafeNormal2D()));
 	}
 	SetCombatActive(Strike != nullptr);
 	return true;
@@ -307,7 +377,9 @@ void AEnemyBase::UpdateBogPull(float DeltaTime)
 		bIsBeingEaten = false;
 		if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 		{
-			Movement->SetMovementMode(MOVE_Walking);
+			Movement->GravityScale = 0.f;
+			Movement->MaxFlySpeed = MoveSpeed;
+			Movement->SetMovementMode(MOVE_Flying);
 			Movement->MaxWalkSpeed = MoveSpeed;
 		}
 		return;
@@ -347,6 +419,57 @@ void AEnemyBase::AllowPassThroughFights()
 	{
 		Capsule->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 	}
+}
+
+bool AEnemyBase::GetTowerFootprint(FVector& OutCenter, float& OutRadius) const
+{
+	const ACentralTowerBase* Tower = FindCentralTower();
+	if (!Tower || !Tower->TowerMesh)
+	{
+		return false;
+	}
+
+	const FBoxSphereBounds Bounds = Tower->TowerMesh->Bounds;
+	OutCenter = Bounds.Origin;
+	const float BodyRadius = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleRadius() : 42.f;
+	OutRadius = FMath::Max(Bounds.BoxExtent.X, Bounds.BoxExtent.Y) + BodyRadius + 30.f;
+	return true;
+}
+
+FVector AEnemyBase::SteerAroundTower(const FVector& DesiredDir) const
+{
+	if (DesiredDir.IsNearlyZero())
+	{
+		return DesiredDir;
+	}
+
+	FVector Center;
+	float Radius = 0.f;
+	if (!GetTowerFootprint(Center, Radius))
+	{
+		return DesiredDir;
+	}
+
+	const FVector MyLoc = GetActorLocation();
+	const FVector FromCenter = MyLoc - Center;
+	const float Dist = FromCenter.Size2D();
+	const FVector Away = FromCenter.GetSafeNormal2D();
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, Away.IsNearlyZero() ? FVector::ForwardVector : Away);
+	const float SideSign = FVector::DotProduct(Side, DesiredDir) >= 0.f ? 1.f : -1.f;
+	const FVector Tangent = (Side * SideSign).GetSafeNormal2D();
+
+	if (Dist < Radius)
+	{
+		const FVector PushOut = Away.IsNearlyZero() ? FVector(1.f, 0.f, 0.f) : Away;
+		return (Tangent * 0.55f + PushOut).GetSafeNormal2D();
+	}
+
+	if (FVector::Dist2D(MyLoc + DesiredDir * 140.f, Center) < Radius)
+	{
+		return Tangent;
+	}
+
+	return DesiredDir;
 }
 
 FVector AEnemyBase::SteerAroundFights(const FVector& DesiredDir) const
@@ -423,7 +546,7 @@ void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
 			SetCombatActive(AllyAttack != nullptr);
 			if (!AllyAttack)
 			{
-				AddMovementInput((AllyAggro->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+				AddMovementInput(SteerAroundTower((AllyAggro->GetActorLocation() - GetActorLocation()).GetSafeNormal2D()));
 			}
 			return;
 		}
@@ -437,7 +560,7 @@ void AEnemyBase::UpdateMovementAndCombat(float DeltaTime)
 			if (!AttackDefender)
 			{
 				const FVector ToDefender = AggroDefender->GetActorLocation() - GetActorLocation();
-				AddMovementInput(ToDefender.GetSafeNormal2D());
+				AddMovementInput(SteerAroundTower(ToDefender.GetSafeNormal2D()));
 			}
 			return;
 		}
@@ -461,9 +584,17 @@ void AEnemyBase::OnReachedTower(ACentralTowerBase* Tower)
 {
 	UpdateCombatState(nullptr, true);
 
-	if (Tower && CurrentWaypointIndex >= Waypoints.Num())
+	FVector Center;
+	float Radius = 0.f;
+	if (!GetTowerFootprint(Center, Radius))
 	{
-		AddMovementInput((Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D());
+		return;
+	}
+
+	if (FVector::Dist2D(GetActorLocation(), Center) < Radius)
+	{
+		const FVector Outward = (GetActorLocation() - Center).GetSafeNormal2D();
+		AddMovementInput(Outward.IsNearlyZero() ? FVector(1.f, 0.f, 0.f) : Outward);
 	}
 }
 
@@ -471,11 +602,22 @@ void AEnemyBase::FollowPath(float DeltaTime)
 {
 	ACentralTowerBase* Tower = FindCentralTower();
 
+	FVector TowerCenter;
+	float TowerRadius = 0.f;
+	if (GetTowerFootprint(TowerCenter, TowerRadius))
+	{
+		while (CurrentWaypointIndex < Waypoints.Num() && FVector::Dist2D(Waypoints[CurrentWaypointIndex], TowerCenter) < TowerRadius)
+		{
+			++CurrentWaypointIndex;
+		}
+	}
+
 	if (CurrentWaypointIndex >= Waypoints.Num())
 	{
 		if (Tower)
 		{
 			FVector MoveDir = (Tower->GetActorLocation() - GetActorLocation()).GetSafeNormal2D();
+			MoveDir = SteerAroundTower(MoveDir);
 			if (ShouldBypassFights())
 			{
 				MoveDir = SteerAroundFights(MoveDir);
@@ -504,7 +646,7 @@ void AEnemyBase::FollowPath(float DeltaTime)
 		return;
 	}
 
-	FVector MoveDir = ToWaypoint.GetSafeNormal2D();
+	FVector MoveDir = SteerAroundTower(ToWaypoint.GetSafeNormal2D());
 	if (ShouldBypassFights())
 	{
 		MoveDir = SteerAroundFights(MoveDir);

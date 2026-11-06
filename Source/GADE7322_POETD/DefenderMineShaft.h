@@ -31,6 +31,9 @@ protected:
 	UFUNCTION()
 	void GenerateIncome();
 	void RestartIncomeTimer();
+	void ApplyMineMesh(const TCHAR* MeshPath, bool bKeepFootprint);
 
 	FTimerHandle IncomeTimerHandle;
+	int32 CoinsProduced = 0;
+	bool bUsingAdvancedMineMesh = false;
 };

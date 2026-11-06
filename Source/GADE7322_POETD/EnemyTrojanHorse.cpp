@@ -7,6 +7,7 @@
 #include "WorldHealthBar.h"
 #include "TDGameState.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 AEnemyTrojanHorse::AEnemyTrojanHorse()
 {
@@ -148,23 +149,22 @@ void AEnemyTrojanHorse::Burst()
 	const TArray<FVector> Remaining = GetRemainingWaypoints();
 	const FVector Origin = GetActorLocation();
 
-	FActorSpawnParameters SpawnParams;
-	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-	SpawnParams.Owner = GetOwner();
-
 	for (int32 i = 0; i < PassengerCount; ++i)
 	{
 		const float Angle = (2.f * PI * static_cast<float>(i)) / static_cast<float>(FMath::Max(PassengerCount, 1));
 		const FVector Offset(FMath::Cos(Angle) * 80.f, FMath::Sin(Angle) * 80.f, 0.f);
 		const FVector SpawnLoc = Origin + Offset;
 
-		AEnemyBase* Passenger = GetWorld()->SpawnActor<AEnemyBase>(ClassToSpawn, SpawnLoc, GetActorRotation(), SpawnParams);
+		const FTransform SpawnTransform(GetActorRotation(), SpawnLoc);
+		AEnemyBase* Passenger = GetWorld()->SpawnActorDeferred<AEnemyBase>(ClassToSpawn, SpawnTransform, GetOwner(), nullptr, ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn);
 		if (!Passenger)
 		{
 			continue;
 		}
 
+		Passenger->PrepareCartPassenger();
 		Passenger->InitialiseWithWaypoints(Remaining);
+		UGameplayStatics::FinishSpawningActor(Passenger, SpawnTransform);
 
 		UE_LOG(LogTemp, Log, TEXT("Trojan %s burst passenger %s"), *GetName(), *Passenger->GetName());
 	}

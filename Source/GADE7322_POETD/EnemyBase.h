@@ -70,6 +70,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Waypoints")
 	void InitialiseWithWaypoints(const TArray<FVector>& InWaypoints);
 
+	void PrepareCartPassenger();
+
 	UFUNCTION(BlueprintCallable, Category = "Health")
 	void TakeDamageFromDefender(float DamageAmount);
 
@@ -90,6 +92,7 @@ protected:
 	bool bIsBeingEaten = false;
 	bool bIsBogAlly = false;
 	bool bWaypointsInitialised = false;
+	bool bCartPassenger = false;
 
 	TWeakObjectPtr<AActor> BogPullTarget;
 	TWeakObjectPtr<AEnemyBase> EngagedAlly;
@@ -114,9 +117,13 @@ protected:
 	virtual bool ShouldBypassFights() const;
 	void AllowPassThroughFights();
 	FVector SteerAroundFights(const FVector& DesiredDir) const;
+	bool GetTowerFootprint(FVector& OutCenter, float& OutRadius) const;
+	FVector SteerAroundTower(const FVector& DesiredDir) const;
 	virtual void UpdateMovementAndCombat(float DeltaTime);
 	virtual void OnReachedTower(ACentralTowerBase* Tower);
 	virtual void FollowPath(float DeltaTime);
+	void KeepAboveGround();
+	float GetMeshBottomOffset() const;
 	virtual void HandleDeath();
 	void UpdateBogPull(float DeltaTime);
 	bool UpdateBogAllyBehavior();

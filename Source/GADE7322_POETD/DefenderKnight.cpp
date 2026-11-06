@@ -28,19 +28,6 @@ ADefenderKnight::ADefenderKnight()
 	}
 }
 
-void ADefenderKnight::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (!DefenderMesh || !DefenderMesh->GetStaticMesh())
-	{
-		return;
-	}
-
-	const float ScaledHeight = DefenderMesh->GetStaticMesh()->GetBoundingBox().GetSize().Z * FMath::Abs(DefenderMesh->GetComponentScale().Z);
-	AddActorWorldOffset(FVector(0.f, 0.f, ScaledHeight));
-}
-
 void ADefenderKnight::ApplyDefenderMesh()
 {
 	if (!DefenderMesh)

@@ -17,7 +17,6 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 protected:
-	virtual void BeginPlay() override;
 	virtual void ApplyDefenderMesh() override;
 	virtual void ScanAndAttack() override;
 

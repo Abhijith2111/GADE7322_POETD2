@@ -1,7 +1,6 @@
 #include "DefenderMineShaft.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "ProceduralTerrain.h"
 #include "TDGameState.h"
 #include "Kismet/GameplayStatics.h"
@@ -18,25 +17,29 @@ ADefenderMineShaft::ADefenderMineShaft()
 
 	if (DefenderMesh)
 	{
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-		if (CylinderMesh.Succeeded())
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> MineMesh(TEXT("/Game/Buildings/MineT1.MineT1"));
+		if (MineMesh.Succeeded())
 		{
-			DefenderMesh->SetStaticMesh(CylinderMesh.Object);
+			DefenderMesh->SetStaticMesh(MineMesh.Object);
 		}
 	}
 }
 
-void ADefenderMineShaft::ApplyDefenderMesh()
+void ADefenderMineShaft::ApplyMineMesh(const TCHAR* MeshPath, bool bKeepFootprint)
 {
 	if (!DefenderMesh)
 	{
 		return;
 	}
 
-	if (UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+	UStaticMesh* MineMesh = LoadObject<UStaticMesh>(nullptr, MeshPath);
+	if (!MineMesh)
 	{
-		DefenderMesh->SetStaticMesh(CylinderMesh);
+		return;
 	}
+
+	const FVector FootprintAnchor = GetMeshFootprintAnchor();
+	DefenderMesh->SetStaticMesh(MineMesh);
 
 	float TileSize = 200.f;
 	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
@@ -44,24 +47,22 @@ void ADefenderMineShaft::ApplyDefenderMesh()
 		TileSize = FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y);
 	}
 
-	const FBox MeshBox = DefenderMesh->GetStaticMesh() ? DefenderMesh->GetStaticMesh()->GetBoundingBox() : FBox(FVector(-50.f), FVector(50.f));
-	const float MeshWidth = FMath::Max(MeshBox.GetSize().X, 1.f);
-	const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
-	DefenderMesh->SetWorldScale3D(FVector(
-		(TileSize * 0.55f) / MeshWidth,
-		(TileSize * 0.55f) / MeshWidth,
-		(TileSize * 0.8f) / MeshHeight));
+	const FBox MeshBox = MineMesh->GetBoundingBox();
+	const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
+	const float Uniform = (TileSize * 0.7f) / MeshWidth;
+	DefenderMesh->SetWorldScale3D(FVector(Uniform));
 
-	if (UMaterialInterface* BaseMat = DefenderMesh->GetMaterial(0))
+	if (bKeepFootprint)
 	{
-		if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
-		{
-			const FLinearColor Stone(0.28f, 0.26f, 0.24f);
-			DynMat->SetVectorParameterValue(TEXT("Color"), Stone);
-			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Stone);
-			DefenderMesh->SetMaterial(0, DynMat);
-		}
+		RefreshMeshPlacementAfterSwap(FootprintAnchor);
 	}
+}
+
+void ADefenderMineShaft::ApplyDefenderMesh()
+{
+	ApplyMineMesh(bUsingAdvancedMineMesh
+		? TEXT("/Game/Buildings/MineT2.MineT2")
+		: TEXT("/Game/Buildings/MineT1.MineT1"), false);
 }
 
 void ADefenderMineShaft::BeginPlay()
@@ -101,24 +102,7 @@ void ADefenderMineShaft::ApplyUpgradeVisual()
 		return;
 	}
 
-	UStaticMesh* Cart = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Cart.Cart"));
-	if (!Cart)
-	{
-		ShowUpgradeRing(1);
-		return;
-	}
-
-	const FVector FootprintAnchor = GetMeshFootprintAnchor();
-	const FVector OldScale = DefenderMesh->GetComponentScale();
-	const FBox OldBox = DefenderMesh->GetStaticMesh() ? DefenderMesh->GetStaticMesh()->GetBoundingBox() : FBox(FVector(-50.f), FVector(50.f));
-	const float OldWidth = FMath::Max(OldBox.GetSize().X * OldScale.X, OldBox.GetSize().Y * OldScale.Y);
-	const float OldHeight = FMath::Max(OldBox.GetSize().Z * OldScale.Z, 1.f);
-	DefenderMesh->SetStaticMesh(Cart);
-	const FBox NewBox = Cart->GetBoundingBox();
-	const float NewWidth = FMath::Max(FMath::Max(NewBox.GetSize().X, NewBox.GetSize().Y), 1.f);
-	const float NewHeight = FMath::Max(NewBox.GetSize().Z, 1.f);
-	DefenderMesh->SetWorldScale3D(FVector(OldWidth / NewWidth, OldWidth / NewWidth, OldHeight / NewHeight));
-	RefreshMeshPlacementAfterSwap(FootprintAnchor);
+	ShowUpgradeRing(1);
 }
 
 void ADefenderMineShaft::RestartIncomeTimer()
@@ -150,8 +134,17 @@ void ADefenderMineShaft::GenerateIncome()
 		return;
 	}
 
+	const int32 Payout = FMath::Max(CoinsPerPayout, 0);
+	CoinsProduced += Payout;
+
 	if (ATDGameState* GS = GetWorld() ? GetWorld()->GetGameState<ATDGameState>() : nullptr)
 	{
-		GS->AddMoney(FMath::Max(CoinsPerPayout, 0));
+		GS->AddMoney(Payout);
+	}
+
+	if (!bUsingAdvancedMineMesh && CoinsProduced >= 100)
+	{
+		bUsingAdvancedMineMesh = true;
+		ApplyMineMesh(TEXT("/Game/Buildings/MineT2.MineT2"), true);
 	}
 }
