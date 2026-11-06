@@ -425,7 +425,23 @@ void ADefenderBase::ApplyUpgradeVisual()
 		return;
 	}
 
-	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT2.ArcherTowerT2")))
+	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTower.ArcherTower")))
+	{
+		const FVector FootprintAnchor = GetMeshFootprintAnchor();
+		DefenderMesh->SetStaticMesh(UpgradeMesh);
+		DefenderMesh->SetWorldScale3D(FVector(1.f));
+		RefreshMeshPlacementAfterSwap(FootprintAnchor);
+	}
+}
+
+void ADefenderBase::ApplyFollowingUpgradeVisual()
+{
+	if (!DefenderMesh)
+	{
+		return;
+	}
+
+	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/ArcherTowerT3.ArcherTowerT3")))
 	{
 		const FVector FootprintAnchor = GetMeshFootprintAnchor();
 		DefenderMesh->SetStaticMesh(UpgradeMesh);

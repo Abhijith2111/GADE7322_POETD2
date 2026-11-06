@@ -23,6 +23,8 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void ApplyDefenderMesh() override;
 	virtual void ApplyUpgradeVisual() override;
+	virtual void ApplyFollowingUpgradeVisual() override;
+	void ApplyStageMesh(const TCHAR* MeshPath);
 	virtual void ScanAndAttack() override;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat", meta = (ClampMin = "0.1"))

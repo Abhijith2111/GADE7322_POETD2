@@ -1,11 +1,11 @@
 #include "DefenderKnight.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
-#include "Materials/MaterialInstanceDynamic.h"
 #include "EnemyBase.h"
 #include "EnemyBrute.h"
 #include "EnemyTrojanHorse.h"
 #include "ProceduralTerrain.h"
+#include "WeatherManager.h"
 #include "Kismet/GameplayStatics.h"
 
 ADefenderKnight::ADefenderKnight()
@@ -20,12 +20,25 @@ ADefenderKnight::ADefenderKnight()
 
 	if (DefenderMesh)
 	{
-		static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderMesh(TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-		if (CylinderMesh.Succeeded())
+		static ConstructorHelpers::FObjectFinder<UStaticMesh> KnightMesh(TEXT("/Game/Characters/Knight_N_.Knight_N_"));
+		if (KnightMesh.Succeeded())
 		{
-			DefenderMesh->SetStaticMesh(CylinderMesh.Object);
+			DefenderMesh->SetStaticMesh(KnightMesh.Object);
 		}
 	}
+}
+
+void ADefenderKnight::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (!DefenderMesh || !DefenderMesh->GetStaticMesh())
+	{
+		return;
+	}
+
+	const float ScaledHeight = DefenderMesh->GetStaticMesh()->GetBoundingBox().GetSize().Z * FMath::Abs(DefenderMesh->GetComponentScale().Z);
+	AddActorWorldOffset(FVector(0.f, 0.f, ScaledHeight));
 }
 
 void ADefenderKnight::ApplyDefenderMesh()
@@ -35,9 +48,18 @@ void ADefenderKnight::ApplyDefenderMesh()
 		return;
 	}
 
-	if (UStaticMesh* CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder")))
+	const bool bNight = AWeatherManager::Get(this) && AWeatherManager::Get(this)->IsNight();
+	const TCHAR* MeshPath = bNight
+		? TEXT("/Game/Characters/KnightTorch_N_.KnightTorch_N_")
+		: TEXT("/Game/Characters/Knight_N_.Knight_N_");
+	UStaticMesh* KnightMesh = LoadObject<UStaticMesh>(nullptr, MeshPath);
+	if (!KnightMesh)
 	{
-		DefenderMesh->SetStaticMesh(CylinderMesh);
+		KnightMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Characters/Knight_N_.Knight_N_"));
+	}
+	if (KnightMesh)
+	{
+		DefenderMesh->SetStaticMesh(KnightMesh);
 	}
 
 	float TileSize = 200.f;
@@ -48,23 +70,10 @@ void ADefenderKnight::ApplyDefenderMesh()
 	}
 
 	const FBox MeshBox = DefenderMesh->GetStaticMesh() ? DefenderMesh->GetStaticMesh()->GetBoundingBox() : FBox(FVector(-50.f), FVector(50.f));
-	const float MeshWidth = FMath::Max(MeshBox.GetSize().X, 1.f);
+	const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
 	const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
-	DefenderMesh->SetWorldScale3D(FVector(
-		(TileSize * 0.18f) / MeshWidth,
-		(TileSize * 0.18f) / MeshWidth,
-		(TileSize * 0.32f) / MeshHeight));
-
-	if (UMaterialInterface* BaseMat = DefenderMesh->GetMaterial(0))
-	{
-		if (UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this))
-		{
-			const FLinearColor Steel(0.25f, 0.4f, 0.85f);
-			DynMat->SetVectorParameterValue(TEXT("Color"), Steel);
-			DynMat->SetVectorParameterValue(TEXT("BaseColor"), Steel);
-			DefenderMesh->SetMaterial(0, DynMat);
-		}
-	}
+	const float Uniform = FMath::Min((TileSize * 0.55f) / MeshHeight, (TileSize * 0.35f) / MeshWidth);
+	DefenderMesh->SetWorldScale3D(FVector(Uniform));
 }
 
 AEnemyBase* ADefenderKnight::FindPriorityTarget() const

@@ -37,6 +37,7 @@ protected:
 
 public:
 	virtual void ApplyUpgradeVisual();
+	virtual void ApplyFollowingUpgradeVisual();
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components")
 	UStaticMeshComponent* DefenderMesh;

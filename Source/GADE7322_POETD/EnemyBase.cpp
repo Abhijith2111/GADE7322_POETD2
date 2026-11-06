@@ -78,8 +78,12 @@ void AEnemyBase::ApplyGruntCube()
 		return;
 	}
 
-	UStaticMesh* CubeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
-	if (!CubeMesh)
+	UStaticMesh* BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Characters/EnemyKnight_N_.EnemyKnight_N_"));
+	if (!BodyMeshAsset)
+	{
+		BodyMeshAsset = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+	}
+	if (!BodyMeshAsset)
 	{
 		return;
 	}
@@ -97,17 +101,34 @@ void AEnemyBase::ApplyGruntCube()
 		UStaticMeshComponent* BodyMesh = NewObject<UStaticMeshComponent>(this, TEXT("BodyMesh"));
 		BodyMesh->SetupAttachment(GetRootComponent());
 		BodyMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-		BodyMesh->SetRelativeScale3D(FVector(0.7f));
 		BodyMesh->RegisterComponent();
 		MeshComponents.Add(BodyMesh);
 	}
 
+	const FBox MeshBox = BodyMeshAsset->GetBoundingBox();
+	const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
+	const float Uniform = 110.f / MeshHeight;
+	const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.f;
+	const float ScaledHeight = MeshHeight * Uniform;
+	const FVector MeshOffset(0.f, 0.f, -HalfHeight - MeshBox.Min.Z * Uniform + ScaledHeight + 6.f);
+
 	for (UStaticMeshComponent* MeshComp : MeshComponents)
 	{
-		if (MeshComp)
+		if (!MeshComp)
 		{
-			MeshComp->SetStaticMesh(CubeMesh);
+			continue;
 		}
+
+		MeshComp->SetStaticMesh(BodyMeshAsset);
+		MeshComp->SetRelativeScale3D(FVector(Uniform));
+		MeshComp->SetRelativeLocation(MeshOffset);
+		MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	}
+
+	if (HealthBarWidget)
+	{
+		const float HeadZ = MeshOffset.Z + MeshBox.Max.Z * Uniform;
+		UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, HeadZ + 16.f), FVector2D(120.f, 16.f));
 	}
 }
 

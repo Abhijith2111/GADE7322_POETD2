@@ -254,18 +254,44 @@ void ADefenderBarracks::ApplyTroopUpgrade()
 	KnightHealthBonus += 50.f;
 }
 
-void ADefenderBarracks::ApplyUpgradeVisual()
+void ADefenderBarracks::ApplyStageMesh(const TCHAR* MeshPath)
 {
 	if (!DefenderMesh)
 	{
 		return;
 	}
 
-	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/BarracksT2.BarracksT2")))
+	UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, MeshPath);
+	if (!UpgradeMesh)
 	{
-		const FVector FootprintAnchor = GetMeshFootprintAnchor();
-		DefenderMesh->SetStaticMesh(UpgradeMesh);
-		DefenderMesh->SetWorldScale3D(FVector(1.f));
-		RefreshMeshPlacementAfterSwap(FootprintAnchor);
+		return;
 	}
+
+	const FVector FootprintAnchor = GetMeshFootprintAnchor();
+	DefenderMesh->SetStaticMesh(UpgradeMesh);
+
+	float TileSize = 200.f;
+	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
+	{
+		TileSize = FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y);
+	}
+
+	const FBox MeshBox = UpgradeMesh->GetBoundingBox();
+	const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
+	const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
+	DefenderMesh->SetWorldScale3D(FVector(
+		(TileSize * 0.9f) / MeshWidth,
+		(TileSize * 0.9f) / MeshWidth,
+		(TileSize * 0.75f) / MeshHeight));
+	RefreshMeshPlacementAfterSwap(FootprintAnchor);
+}
+
+void ADefenderBarracks::ApplyUpgradeVisual()
+{
+	ApplyStageMesh(TEXT("/Game/Buildings/Barracks.Barracks"));
+}
+
+void ADefenderBarracks::ApplyFollowingUpgradeVisual()
+{
+	ApplyStageMesh(TEXT("/Game/Buildings/BarracksT3.BarracksT3"));
 }

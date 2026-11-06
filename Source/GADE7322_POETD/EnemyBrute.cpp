@@ -1,5 +1,7 @@
 #include "EnemyBrute.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Components/CapsuleComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Kismet/GameplayStatics.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -22,12 +24,15 @@ AEnemyBrute::AEnemyBrute()
 	BruteMesh->SetupAttachment(RootComponent);
 	BruteMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (SphereMesh.Succeeded())
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> TankMesh(TEXT("/Game/Characters/Brute_Tank_.Brute_Tank_"));
+	if (TankMesh.Succeeded())
 	{
-		BruteMesh->SetStaticMesh(SphereMesh.Object);
-		BruteMesh->SetRelativeScale3D(FVector(1.6f, 1.6f, 1.6f));
-		BruteMesh->SetRelativeLocation(FVector(0.f, 0.f, 40.f));
+		BruteMesh->SetStaticMesh(TankMesh.Object);
+		const FBox MeshBox = TankMesh.Object->GetBoundingBox();
+		const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
+		const float Uniform = 170.f / MeshHeight;
+		BruteMesh->SetRelativeScale3D(FVector(Uniform));
+		BruteMesh->SetRelativeLocation(FVector(0.f, 0.f, -88.f - MeshBox.Min.Z * Uniform + MeshHeight * Uniform + 6.f));
 	}
 
 	if (HealthBarWidget)
@@ -59,19 +64,20 @@ void AEnemyBrute::BeginPlay()
 
 	if (BruteMesh)
 	{
-		UMaterialInterface* BaseMat = BruteMesh->GetMaterial(0);
-		if (!BaseMat)
+		if (UStaticMesh* TankMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Characters/Brute_Tank_.Brute_Tank_")))
 		{
-			BaseMat = BruteMesh->GetStaticMesh() ? BruteMesh->GetStaticMesh()->GetMaterial(0) : nullptr;
-		}
-		if (BaseMat)
-		{
-			UMaterialInstanceDynamic* DynMat = UMaterialInstanceDynamic::Create(BaseMat, this);
-			if (DynMat)
+			BruteMesh->SetStaticMesh(TankMesh);
+			const FBox MeshBox = TankMesh->GetBoundingBox();
+			const float MeshHeight = FMath::Max(MeshBox.GetSize().Z, 1.f);
+			const float Uniform = 170.f / MeshHeight;
+			const float HalfHeight = GetCapsuleComponent() ? GetCapsuleComponent()->GetScaledCapsuleHalfHeight() : 88.f;
+			const FVector MeshOffset(0.f, 0.f, -HalfHeight - MeshBox.Min.Z * Uniform + MeshHeight * Uniform + 6.f);
+			BruteMesh->SetRelativeScale3D(FVector(Uniform));
+			BruteMesh->SetRelativeLocation(MeshOffset);
+			if (HealthBarWidget)
 			{
-				DynMat->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.55f, 0.08f, 0.08f));
-				DynMat->SetVectorParameterValue(TEXT("BaseColor"), FLinearColor(0.55f, 0.08f, 0.08f));
-				BruteMesh->SetMaterial(0, DynMat);
+				const float HeadZ = MeshOffset.Z + MeshBox.Max.Z * Uniform;
+				UWorldHealthBarLibrary::ConfigureWorldHealthBar(HealthBarWidget, FVector(0.f, 0.f, HeadZ + 18.f), FVector2D(140.f, 18.f));
 			}
 		}
 	}

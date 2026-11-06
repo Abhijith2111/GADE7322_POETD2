@@ -223,6 +223,7 @@ private:
 	int32 GetBogCap() const;
 	int32 CountLivingBogs() const;
 	bool IsBogCapReached() const;
+	bool IsBarracksCapReached() const;
 	void PlayUpgradeSparkle(AActor* Target);
 	void RefreshUpgradeMenu();
 };

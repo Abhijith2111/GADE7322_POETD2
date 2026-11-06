@@ -35,7 +35,16 @@ void ADefenderBog::ApplyDefenderMesh()
 		return;
 	}
 
-	if (UStaticMesh* SpireMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Spire.Spire")))
+	UStaticMesh* SpireMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/SpireT1.SpireT1"));
+	if (!SpireMesh)
+	{
+		SpireMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/Spire.Spire"));
+	}
+	if (!SpireMesh)
+	{
+		SpireMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/SpireBase.SpireBase"));
+	}
+	if (SpireMesh)
 	{
 		DefenderMesh->SetStaticMesh(SpireMesh);
 		DefenderMesh->SetWorldScale3D(FVector(1.f));
@@ -213,19 +222,42 @@ void ADefenderBog::ApplyConvertUpgrade()
 	OnHealthChanged.Broadcast(CurrentHealth, MaxHealth);
 }
 
-void ADefenderBog::ApplyUpgradeVisual()
+void ADefenderBog::ApplyStageMesh(const TCHAR* MeshPath)
 {
 	if (!DefenderMesh)
 	{
 		return;
 	}
 
-	if (UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Game/Buildings/SpireT2.SpireT2")))
+	UStaticMesh* UpgradeMesh = LoadObject<UStaticMesh>(nullptr, MeshPath);
+	if (!UpgradeMesh)
 	{
-		const FVector FootprintAnchor = GetMeshFootprintAnchor();
-		DefenderMesh->SetStaticMesh(UpgradeMesh);
-		DefenderMesh->SetWorldScale3D(FVector(1.f));
-		RefreshMeshPlacementAfterSwap(FootprintAnchor);
-		GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadBogSlimeMaterial());
+		return;
 	}
+
+	const FVector FootprintAnchor = GetMeshFootprintAnchor();
+	DefenderMesh->SetStaticMesh(UpgradeMesh);
+
+	float TileSize = 200.f;
+	if (const AProceduralTerrain* Terrain = Cast<AProceduralTerrain>(UGameplayStatics::GetActorOfClass(GetWorld(), AProceduralTerrain::StaticClass())))
+	{
+		TileSize = FMath::Max(Terrain->TileDimensions.X, Terrain->TileDimensions.Y);
+	}
+
+	const FBox MeshBox = UpgradeMesh->GetBoundingBox();
+	const float MeshWidth = FMath::Max(FMath::Max(MeshBox.GetSize().X, MeshBox.GetSize().Y), 1.f);
+	const float Uniform = (TileSize * 0.7f) / MeshWidth;
+	DefenderMesh->SetWorldScale3D(FVector(Uniform));
+	RefreshMeshPlacementAfterSwap(FootprintAnchor);
+	GameVFX::ApplyDynamicMaterialToMesh(DefenderMesh, GameVFX::LoadBogSlimeMaterial());
+}
+
+void ADefenderBog::ApplyUpgradeVisual()
+{
+	ApplyStageMesh(TEXT("/Game/Buildings/SpireT2.SpireT2"));
+}
+
+void ADefenderBog::ApplyFollowingUpgradeVisual()
+{
+	ApplyStageMesh(TEXT("/Game/Buildings/SpireT3.SpireT3"));
 }

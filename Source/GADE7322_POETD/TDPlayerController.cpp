@@ -908,6 +908,12 @@ void ATDPlayerController::TryPlaceDefender()
 		}
 	}
 
+	if (DefenderClass->IsChildOf(ADefenderBarracks::StaticClass()) && IsBarracksCapReached())
+	{
+		OnDefenderPlacementFailed.Broadcast(TEXT("Only one barracks can be placed on Difficult."));
+		return;
+	}
+
 	if (DefenderClass->IsChildOf(ADefenderBog::StaticClass()) && IsBogCapReached())
 	{
 		OnDefenderPlacementFailed.Broadcast(TEXT("Bog limit reached for this difficulty."));
@@ -994,6 +1000,10 @@ void ATDPlayerController::ApplyDefenderButtonVisual(UButton* Button, TSubclassOf
 				break;
 			}
 		}
+	}
+	else if (InDefenderClass && InDefenderClass->IsChildOf(ADefenderBarracks::StaticClass()) && IsBarracksCapReached())
+	{
+		bLocked = true;
 	}
 	else if (InDefenderClass && InDefenderClass->IsChildOf(ADefenderBog::StaticClass()) && IsBogCapReached())
 	{
@@ -1190,6 +1200,27 @@ bool ATDPlayerController::IsBogCapReached() const
 {
 	const int32 Cap = GetBogCap();
 	return Cap > 0 && CountLivingBogs() >= Cap;
+}
+
+bool ATDPlayerController::IsBarracksCapReached() const
+{
+	const UTDGameInstance* GI = Cast<UTDGameInstance>(GetGameInstance());
+	if (!GI || GI->GetDifficulty() != ETDDifficulty::Hard)
+	{
+		return false;
+	}
+
+	TArray<AActor*> Found;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), ADefenderBarracks::StaticClass(), Found);
+	for (AActor* Actor : Found)
+	{
+		const ADefenderBarracks* Barracks = Cast<ADefenderBarracks>(Actor);
+		if (Barracks && !Barracks->IsDestroyed())
+		{
+			return true;
+		}
+	}
+	return false;
 }
 
 void ATDPlayerController::ZoomToTarget(AActor* Target)
@@ -1471,13 +1502,24 @@ void ATDPlayerController::ApplyChosenUpgrade(int32 Choice)
 		}
 	}
 
-	if (NextLevel == 1)
+	if (Defender->IsA(ADefenderMineShaft::StaticClass()))
+	{
+		if (NextLevel == 1)
+		{
+			Defender->ApplyUpgradeVisual();
+		}
+		else
+		{
+			Defender->ShowUpgradeRing(2);
+		}
+	}
+	else if (NextLevel <= 1)
 	{
 		Defender->ApplyUpgradeVisual();
 	}
 	else
 	{
-		Defender->ShowUpgradeRing(NextLevel >= 3 ? 2 : 1);
+		Defender->ApplyFollowingUpgradeVisual();
 	}
 
 	*LevelPtr = NextLevel;

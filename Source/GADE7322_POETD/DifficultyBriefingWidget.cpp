@@ -54,12 +54,13 @@ namespace
 			"- Bog: pulls in and digests enemies (place off the path).\n"
 			"- Mine: support building.\n\n"
 			"Upgrades\n"
-			"Click a placed archer, barracks, bog, mine, or the temple to open its upgrade menu. Every upgrade adds health to that building and spends coins. Archers cost 100, barracks and mines cost 150, bogs cost 200, and the temple costs 250. Later upgrades cost the same amount. Knights cannot be upgraded. Barracks upgrades make the knights trained afterwards stronger.\n"
-			"- Archer: the first upgrade adds 20 health and 5 damage, and changes the tower's look. The next upgrade chooses a path, and you can pick only one. Health and attack speed adds 30 health and makes the tower shoot faster. Attack power adds 20 health and 10 damage. The upgrade after that stays on the path you picked: more health and a faster shot, or more attack power. The choice adds a gold ring, and the last upgrade grows it.\n"
-			"- Barracks: each upgrade adds 40 health. The first also trains knights 3 seconds faster and changes the building's look. The next trains 3 seconds faster again, new knights deal 1 more damage, and a gold ring appears. The last adds 2 more damage and 50 health to knights trained after that upgrade, and the ring grows.\n"
-			"- Bog: the first upgrade adds 30 health, digests 3 seconds faster, and changes the building's look. The next adds 30 health, digests 5 seconds faster, and adds a gold ring. The last adds 50 health, and gives a 30% chance that an eaten enemy becomes an ally that fights other attackers until it is defeated. The ring grows.\n"
-			"- Mine: two upgrades. The first adds 40 health, pays out 3 seconds faster, and changes the mine's look. The second adds 40 health, pays 10 more coins, and adds a gold ring.\n"
-			"- Temple: two upgrades. The first adds 100 health and 8 attack damage, and adds a gold crown. The second adds 100 health, makes it attack 20% faster, and grows the crown.\n\n");
+			"Click an archer, barracks, bog, mine, or the temple. Each upgrade costs coins and adds health.\n"
+			"- Archer, 100 coins: a new look, then choose health and attack speed or attack power. The last upgrade stays on that choice.\n"
+			"- Barracks, 150 coins: faster training, then stronger knights trained after the upgrade.\n"
+			"- Bog, 200 coins: faster digestion, then a chance to turn an eaten enemy into an ally.\n"
+			"- Mine, 150 coins: faster payouts, then more coins.\n"
+			"- Temple, 250 coins: harder hits, then faster attacks.\n"
+			"Knights cannot be upgraded.\n\n");
 
 		const FText Weather = NSLOCTEXT(
 			"Briefing",
@@ -102,6 +103,7 @@ namespace
 					"- Enemies will hunt your mines.\n\n"
 					"Limits\n"
 					"- You may place at most 3 bogs.\n"
+					"- You may place only one barracks.\n"
 					"- Bog digestion takes about 60 seconds."
 					"{1}"),
 				Defenders,

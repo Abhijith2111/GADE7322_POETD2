@@ -582,11 +582,18 @@ void AWeatherManager::SetRainVisible(bool bVisible)
 {
 	for (UStaticMeshComponent* Drop : RainDropMeshes)
 	{
-		if (Drop)
+		if (!Drop)
 		{
-			Drop->SetHiddenInGame(!bVisible);
-			Drop->SetVisibility(bVisible, true);
+			continue;
 		}
+
+		Drop->SetVisibility(bVisible, true);
+		Drop->SetHiddenInGame(!bVisible, true);
+		if (!bVisible)
+		{
+			Drop->SetWorldLocation(FVector(0.f, 0.f, -100000.f));
+		}
+		Drop->MarkRenderStateDirty();
 	}
 }
 
@@ -613,6 +620,11 @@ void AWeatherManager::ResetRainDropPositions()
 
 void AWeatherManager::UpdateRainDrops(float DeltaSeconds)
 {
+	if (CurrentWeather != EWeatherType::Rainy)
+	{
+		SetRainVisible(false);
+		return;
+	}
 	for (int32 Index = 0; Index < RainDropMeshes.Num(); ++Index)
 	{
 		UStaticMeshComponent* Drop = RainDropMeshes[Index];
